@@ -626,5 +626,34 @@ st.markdown(f"""
 
 
 
+# Main execution
+if __name__ == "__main__":
+    st.title("Health Facility Name Matching")
+    
+    st.markdown("""
+        <div class="img-container" style="text-align: center;">
+            <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
+                 style="width: 50%; max-width: 500px; margin: 20px auto;">
+        </div>
+    """, unsafe_allow_html=True)
+    
+    main()
+    
+    # Enable animations if checkbox is checked
+    if st.sidebar.checkbox("Enable Auto Animations", value=False):
+        def show_periodic_animations():
+            while True:
+                time.sleep(60)
+                random.choice(animations_list)()
+                time.sleep(10)
+                random.choice(animations_list)()
+
+        if not hasattr(st.session_state, 'animation_thread'):
+            st.session_state.animation_thread = threading.Thread(target=show_periodic_animations)
+            st.session_state.animation_thread.daemon = True
+            st.session_state.animation_thread.start()
+
+
+
 
 
