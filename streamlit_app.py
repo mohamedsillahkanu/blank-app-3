@@ -97,9 +97,9 @@ st.markdown("""
     /* Dark Theme Button Styling */
     [data-theme="dark"] .stButton > button,
     [data-theme="dark"] .stDownloadButton > button {
-        color: white !important;
+        color: black !important;
         font-weight: bold !important;
-        background-color: blue !important;
+        background-color: red !important;
         border: 2px solid #3498db !important;
         border-radius: 4px !important;
         padding: 0.5rem 1rem !important;
@@ -110,7 +110,7 @@ st.markdown("""
 
     [data-theme="dark"] .stButton > button:hover,
     [data-theme="dark"] .stDownloadButton > button:hover {
-        background-color: #2E2E2E !important;
+        background-color: blue !important;
         box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
         transform: translateY(-1px) !important;
     }
