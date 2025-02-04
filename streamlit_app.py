@@ -498,6 +498,133 @@ else:
     """)
 
 
+def show_confetti():
+    """Display confetti animation."""
+    st.markdown("""
+        <style>
+            @keyframes confetti {
+                0% { transform: translateY(0) rotate(0deg); }
+                100% { transform: translateY(100vh) rotate(360deg); }
+            }
+            .confetti {
+                position: fixed;
+                animation: confetti 4s linear;
+                z-index: 9999;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    for i in range(50):
+        color = f"hsl({random.randint(0, 360)}, 100%, 50%)"
+        left = random.randint(0, 100)
+        st.markdown(f"""
+            <div class="confetti" style="left: {left}vw; background: {color}; 
+            width: 10px; height: 10px; border-radius: 50%;"></div>
+        """, unsafe_allow_html=True)
+
+def show_sparkles():
+    """Display sparkles animation."""
+    st.markdown("""
+        <style>
+            @keyframes sparkle {
+                0% { transform: scale(0); opacity: 0; }
+                50% { transform: scale(1); opacity: 1; }
+                100% { transform: scale(0); opacity: 0; }
+            }
+            .sparkle {
+                position: fixed;
+                animation: sparkle 2s infinite;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    for i in range(20):
+        left = random.randint(0, 100)
+        top = random.randint(0, 100)
+        st.markdown(f"""
+            <div class="sparkle" style="left: {left}vw; top: {top}vh; 
+            background: gold; width: 5px; height: 5px; border-radius: 50%;"></div>
+        """, unsafe_allow_html=True)
+
+def show_fireworks():
+    """Display random fireworks animation."""
+    animations = [st.balloons(), st.snow(), show_confetti(), show_sparkles()]
+    random.choice(animations)
+
+# List of available animations
+animations_list = [
+    st.balloons,
+    st.snow,
+    show_confetti,
+    show_sparkles,
+    show_fireworks,
+    lambda: [st.balloons(), st.snow()],
+    lambda: [show_confetti(), show_sparkles()],
+    lambda: [st.balloons(), show_confetti()],
+    lambda: [st.snow(), show_sparkles()],
+    lambda: [show_confetti(), st.snow()]
+]
+
+# Initialize session state for animations
+if 'last_animation' not in st.session_state:
+    st.session_state.last_animation = time.time()
+    st.session_state.theme_index = list(themes.keys()).index("Black Modern")
+    st.session_state.first_load = True
+
+# Show welcome message on first load
+if st.session_state.first_load:
+    st.balloons()
+    st.snow()
+    welcome_placeholder = st.empty()
+    welcome_placeholder.success("Welcome to the Geospatial Analysis Tool! 🌍")
+    time.sleep(3)
+    welcome_placeholder.empty()
+    st.session_state.first_load = False
+
+# Handle theme rotation
+current_time = time.time()
+if current_time - st.session_state.last_animation >= 30:
+    st.session_state.last_animation = current_time
+    theme_keys = list(themes.keys())
+    st.session_state.theme_index = (st.session_state.theme_index + 1) % len(theme_keys)
+    st.balloons()
+
+# Theme selection
+selected_theme = st.sidebar.selectbox(
+    "🎨 Select Theme",
+    list(themes.keys()),
+    index=st.session_state.theme_index,
+    key='theme_selector'
+)
+
+# Handle theme change animations
+if 'previous_theme' not in st.session_state:
+    st.session_state.previous_theme = selected_theme
+if st.session_state.previous_theme != selected_theme:
+    st.balloons()
+    st.snow()
+    st.session_state.previous_theme = selected_theme
+
+# Apply selected theme
+theme = themes[selected_theme]
+is_light_theme = "Light" in selected_theme
+
+st.markdown(f"""
+    <style>
+        :root {{
+            --bg-color: {theme['bg']};
+            --text-color: {theme['text']};
+            --accent-color: {theme['accent']};
+            --gradient: {theme['gradient']};
+            --sidebar-bg: {theme['bg']};
+            --card-bg: {'#F8F9FA' if is_light_theme else '#1E1E1E'};
+            --card-hover-bg: {'#E9ECEF' if is_light_theme else '#2E2E2E'};
+            --input-bg: {'#F8F9FA' if is_light_theme else '#1E1E1E'};
+            --shadow-color: {f'rgba(0, 0, 0, 0.1)' if is_light_theme else 'rgba(0, 0, 0, 0.3)'};
+            --border-color: {'#DEE2E6' if is_light_theme else '#2E2E2E'};
+        }}
+    </style>
+""", unsafe_allow_html=True)
+
+
 
 
 
