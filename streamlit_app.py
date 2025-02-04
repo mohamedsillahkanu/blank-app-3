@@ -99,7 +99,7 @@ st.markdown("""
     [data-theme="dark"] .stDownloadButton > button {
         color: rgba(0, 0, 0, 1) !important;  !important;
         font-weight: 800 !important;
-        background-color: white !important;
+        background-color: #1E1E1E  !important;
         border: 2px solid #3498db !important;
         border-radius: 4px !important;
         padding: 0.5rem 1rem !important;
