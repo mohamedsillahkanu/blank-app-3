@@ -97,9 +97,9 @@ st.markdown("""
     /* Dark Theme Button Styling */
     [data-theme="dark"] .stButton > button,
     [data-theme="dark"] .stDownloadButton > button {
-        color: rgba(0, 0, 0, 1) !important;  !important;
+        color: #fff !important;  !important;
         font-weight: 800 !important;
-        background-color: #1E1E1E  !important;
+        background-color: #0a0a23;  !important;
         border: 2px solid #3498db !important;
         border-radius: 4px !important;
         padding: 0.5rem 1rem !important;
