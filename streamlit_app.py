@@ -29,8 +29,8 @@ particles_js = """
         
         #particles-js {
             position: fixed;
-            width: 100%;
-            height: 100%;
+            width: 20%;
+            height: 20%;
             top: 0;
             left: 0;
             right: 0;
