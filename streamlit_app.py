@@ -34,7 +34,7 @@ particles_js = """
         #particles-js {
             position: fixed;
             width: 100vw;
-            height: 100vh;
+            height: 80vh;
             top: 0;
             left: 0;
             z-index: 0;
