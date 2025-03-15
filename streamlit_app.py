@@ -5,13 +5,9 @@ import time
 import threading
 
 # Main title
-st.markdown("""
-<div class="full-width-title">
-    <h1>Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
-</div>
-""", unsafe_allow_html=True)
+st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Intervention")
 
-# Adjust the CSS for the title to match the particles styling
+# Adjust the CSS for the title to 
 st.markdown("""
     <style>
         .full-width-title {
