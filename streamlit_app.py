@@ -298,9 +298,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Create columns for better responsive layout
-col1, col2 = st.columns([1, 1])
-
 # Sections content
 sections = {
     "Overview": """Before now, the Sub-National Tailoring (SNT) process took a considerable amount of time to complete analysis. Based on the experience of the 2023 SNT implementation, we have developed an automated tool using the same validated codes with additional enhanced features. This innovation aims to build the capacity of National Malaria Control Program (NMCP) to conduct SNT easily on a yearly basis and monitor activities effectively using this tool. The tool is designed to be user-friendly and offers high processing speed.
@@ -326,27 +323,14 @@ The integration of automation in geospatial analysis significantly enhances the 
     "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely and informed decision-making. This tool, built on the experience of the 2023 SNT implementation, not only addresses existing operational challenges but also empowers analysts to focus on deriving insights rather than getting lost in technical details. The user-friendly interface and high processing speed make it an invaluable asset for regular SNT updates and monitoring of malaria control activities."""
 }
 
-# Distribute sections between columns for better responsive layout
-section_items = list(sections.items())
-half_length = len(section_items) // 2 + len(section_items) % 2  # Ensure even distribution
-
-with col1:
-    for title, content in section_items[:half_length]:
-        st.markdown(f"""
-            <div class="section-card">
-                <div class="section-header">{title}</div>
-                <div class="content-text">{content}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-with col2:
-    for title, content in section_items[half_length:]:
-        st.markdown(f"""
-            <div class="section-card">
-                <div class="section-header">{title}</div>
-                <div class="content-text">{content}</div>
-            </div>
-        """, unsafe_allow_html=True)
+# Display sections in a single column
+for title, content in sections.items():
+    st.markdown(f"""
+        <div class="section-card">
+            <div class="section-header">{title}</div>
+            <div class="content-text">{content}</div>
+        </div>
+    """, unsafe_allow_html=True)
 
 # Add a footer
 st.markdown("""
