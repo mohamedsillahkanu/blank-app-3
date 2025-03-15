@@ -11,7 +11,38 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Particles.js HTML configuration
+# Adjust the CSS for the title to match the particles styling
+st.markdown("""
+    <style>
+        .full-width-title {
+            width: 100%;
+            text-align: center;
+            background-color: rgba(14, 17, 23, 0.8);
+            padding: 20px 0;
+            margin: 0;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .full-width-title h1 {
+            color: white !important;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0;
+            padding: 0 15px;
+            line-height: 1.3;
+        }
+        
+        /* Make title responsive */
+        @media (max-width: 768px) {
+            .full-width-title h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Modified particles.js HTML configuration - now covers the whole page
 particles_js = """
 <!DOCTYPE html>
 <html lang="en">
@@ -30,7 +61,7 @@ particles_js = """
         #particles-js {
             position: fixed;
             width: 100%;
-            height: 20%;
+            height: 100%;
             top: 0;
             left: 0;
             right: 0;
@@ -134,8 +165,9 @@ st.markdown("""
             z-index: 1;
         }
 
+        /* Modified section card styling to be more transparent */
         .section-card {
-            background: rgba(30, 30, 30, 0.8) !important;
+            background: rgba(30, 30, 30, 0.7) !important;
             color: #E0E0E0 !important;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
             border-radius: 15px;
@@ -150,7 +182,7 @@ st.markdown("""
         .section-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
-            background: rgba(46, 46, 46, 0.9) !important;
+            background: rgba(46, 46, 46, 0.8) !important;
         }
 
         .section-header {
@@ -190,6 +222,27 @@ st.markdown("""
             padding-left: 1rem !important;
             padding-right: 1rem !important;
         }
+        
+        /* Image container styling */
+        .img-container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            margin: 0 auto;
+            background: rgba(14, 17, 23, 0.3);
+            border-radius: 15px;
+            padding: 20px 0;
+            max-width: 90%;
+        }
+        
+        .img-container img {
+            width: 80%; 
+            max-width: 800px; 
+            margin: 0 auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -203,11 +256,11 @@ if st.session_state.first_load:
     welcome_placeholder = st.empty()
     st.session_state.first_load = False
 
-# Map image
+# Map image with updated container to allow particles to show through
 st.markdown("""
-    <div class="img-container" style="text-align: center;">
+    <div class="img-container">
         <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
-             style="width: 80%; max-width: 800px; margin: 20px auto;">
+             alt="Sierra Leone Map">
     </div>
 """, unsafe_allow_html=True)
 
