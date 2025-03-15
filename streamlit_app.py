@@ -4,29 +4,32 @@ import streamlit.components.v1 as components
 # Configure the page to use wide layout
 st.set_page_config(layout="wide")
 
-# Use Streamlit's native title - this ensures it's properly rendered in the Streamlit component hierarchy
+# Set title with maximum visibility - using Streamlit's native title component
 st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
 
-# Add custom CSS to style everything
+# Custom CSS with improved title visibility
 st.markdown("""
     <style>
-        /* Make the title stand out with enhanced styling */
-        .stApp h1:first-of-type {
+        /* Enhanced styling for title */
+        .stApp div[data-testid="stHeader"] {
+            display: none;  /* Hide the default header */
+        }
+        
+        .stApp h1 {
             color: white !important;
             font-size: 2.5rem !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 20px 0 !important;
-            background-color: rgba(14, 17, 23, 0.9) !important;
+            padding: 20px 10px !important;
+            background-color: rgba(14, 17, 23, 0.95) !important;
             border-bottom: 3px solid #3498db !important;
             margin-bottom: 25px !important;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5) !important;
-            z-index: 9999 !important;
             position: relative !important;
         }
         
-        /* General styling for the app */
+        /* General app styling */
         .stApp {
             background-color: #0E1117 !important;
             color: #E0E0E0 !important;
@@ -72,12 +75,12 @@ st.markdown("""
             z-index: 1;
         }
 
-        /* Remove default padding to bring elements closer together */
+        /* Remove default padding */
         .e1f1d6gn1, .block-container {
             padding-top: 0 !important;
         }
 
-        /* Modified section card styling to be more transparent */
+        /* Section styling */
         .section-card {
             background: rgba(30, 30, 30, 0.7) !important;
             color: #E0E0E0 !important;
@@ -156,65 +159,63 @@ st.markdown("""
             border: 1px solid rgba(52, 152, 219, 0.3);
         }
         
-        /* Make particles stay in background */
-        #particles-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            pointer-events: none;
+        /* Responsive title */
+        @media (max-width: 768px) {
+            .stApp h1 {
+                font-size: 1.8rem !important;
+            }
         }
     </style>
 """, unsafe_allow_html=True)
 
-# Create a better particles implementation that won't interfere with content
+# Create a simplified particles.js implementation (added after title)
 particles_js = """
-<div id="particles-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none;">
+<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none;">
     <div id="particles-js" style="width: 100%; height: 100%;"></div>
 </div>
 <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 <script>
-    particlesJS("particles-js", {
-        "particles": {
-            "number": {"value": 300, "density": {"enable": true, "value_area": 800}},
-            "color": {"value": "#ffffff"},
-            "shape": {"type": "circle"},
-            "opacity": {"value": 0.3, "random": false},
-            "size": {"value": 2, "random": true},
-            "line_linked": {
-                "enable": true,
-                "distance": 100,
-                "color": "#ffffff",
-                "opacity": 0.15,
-                "width": 1
+    document.addEventListener("DOMContentLoaded", function() {
+        particlesJS("particles-js", {
+            "particles": {
+                "number": {"value": 120, "density": {"enable": true, "value_area": 800}},
+                "color": {"value": "#ffffff"},
+                "shape": {"type": "circle"},
+                "opacity": {"value": 0.2, "random": false},
+                "size": {"value": 2, "random": true},
+                "line_linked": {
+                    "enable": true,
+                    "distance": 100,
+                    "color": "#ffffff",
+                    "opacity": 0.1,
+                    "width": 1
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 0.2,
+                    "direction": "none",
+                    "random": false,
+                    "straight": false,
+                    "out_mode": "out",
+                    "bounce": true
+                }
             },
-            "move": {
-                "enable": true,
-                "speed": 0.2,
-                "direction": "none",
-                "random": false,
-                "straight": false,
-                "out_mode": "out",
-                "bounce": true
-            }
-        },
-        "interactivity": {
-            "detect_on": "window",
-            "events": {
-                "onhover": {"enable": true, "mode": "grab"},
-                "onclick": {"enable": true, "mode": "repulse"},
-                "resize": true
-            }
-        },
-        "retina_detect": true
+            "interactivity": {
+                "detect_on": "window",
+                "events": {
+                    "onhover": {"enable": true, "mode": "grab"},
+                    "onclick": {"enable": true, "mode": "repulse"},
+                    "resize": true
+                }
+            },
+            "retina_detect": true
+        });
     });
 </script>
 """
 
-# Add particles as fixed background that won't interfere with content
-st.components.html(particles_js, height=0)
+# IMPORTANT: Use components.html (not st.components.html) with a minimal height
+components.html(particles_js, height=100)
 
 # Display map image
 st.markdown("""
@@ -237,7 +238,7 @@ if st.session_state.first_load:
 sections = {
     "Overview": """Before now, the Sub-National Tailoring (SNT) process took a considerable amount of time to complete analysis. Based on the experience of the 2023 SNT implementation, we have developed an automated tool using the same validated codes with additional enhanced features. This innovation aims to build the capacity of National Malaria Control Program (NMCP) to conduct SNT easily on a yearly basis and monitor activities effectively using this tool. The tool is designed to be user-friendly and offers high processing speed.
 
-The integration of automation in geospatial analysis significantly enhances the efficiency and effectiveness of data management and visualization tasks. With the introduction of this automated system, analysis time has been drastically reduced from one year to one week. This shift not only streamlines operations but also allows analysts to focus on interpreting results rather than being bogged down by technical processes.""",
+The integration of automation in geospatial analysis significantly enhances the efficiency and effectiveness of data management and visualization tasks. With the introduction of this automated system, analysis time has been drastically reduced from one year to one week. This shift not only streamlines operations but also allows analysts to focus on interpreting results rather than getting lost in technical details.""",
     
     "Objectives": """The main objectives of implementing automated systems for geospatial analysis and data management are:
     <div class='custom-bullet'>Reduce Time and Effort: Significantly decrease the time required to create maps and analyze data, enabling quicker decision-making.</div>
