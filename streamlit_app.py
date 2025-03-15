@@ -21,7 +21,7 @@ particles_js = """
             padding: 0;
             width: 100%;
             height: 100%;
-            overflow: hidden;
+            overflow-x: hidden;
         }
         
         #particles-js {
@@ -30,6 +30,8 @@ particles_js = """
             height: 100vh;
             top: 0;
             left: 0;
+            right: 0;
+            bottom: 0;
             z-index: 0;
             background-color: transparent;
         }
@@ -83,8 +85,8 @@ particles_js = """
 </html>
 """
 
-# Inject particles.js with full height
-components.html(particles_js, height=3000, width=None)
+# Inject particles.js with full width and height
+components.html(particles_js, height=3000, width="100%")
 
 # Styling with full page adjustments
 st.markdown("""
@@ -94,17 +96,34 @@ st.markdown("""
             background-color: #0E1117 !important;
             color: #E0E0E0 !important;
             min-height: 100vh;
-            width: 100%;
+            width: 100vw;
+            max-width: 100% !important;
             overflow-x: hidden;
+            padding: 0 !important;
+            margin: 0 !important;
         }
         
-        /* Hide default Streamlit margins */
+        /* Hide default Streamlit margins and make full width */
         .main .block-container {
-            max-width: 100%;
+            max-width: 100% !important;
+            width: 100vw !important;
             padding-top: 1rem;
-            padding-right: 1rem;
-            padding-left: 1rem;
+            padding-right: 0;
+            padding-left: 0;
             padding-bottom: 1rem;
+            margin: 0 !important;
+        }
+        
+        /* Remove any fixed width constraints */
+        .st-emotion-cache-1n76uvr {
+            width: 100% !important;
+            max-width: none !important;
+        }
+        
+        /* Make sure report container is full width */
+        .reportview-container {
+            width: 100% !important;
+            max-width: 100% !important;
         }
         
         /* Updated Sidebar Styling */
@@ -253,10 +272,10 @@ The integration of automation in geospatial analysis significantly enhances the 
     "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely and informed decision-making. This tool, built on the experience of the 2023 SNT implementation, not only addresses existing operational challenges but also empowers analysts to focus on deriving insights rather than getting lost in technical details. The user-friendly interface and high processing speed make it an invaluable asset for regular SNT updates and monitoring of malaria control activities."""
 }
 
-# Create columns for a more organized layout
-col1, col2 = st.columns([1, 3])
+# Use the full width for content
+st.markdown("<div style='width:100%; padding:0 10px;'>", unsafe_allow_html=True)
 
-# Display sections with improved layout
+# Display sections using full width
 for title, content in sections.items():
     st.markdown(f"""
         <div class="section-card">
@@ -264,3 +283,6 @@ for title, content in sections.items():
             <div class="content-text">{content}</div>
         </div>
     """, unsafe_allow_html=True)
+
+# Close the full width container after all sections
+st.markdown("</div>", unsafe_allow_html=True)
