@@ -7,7 +7,7 @@ import threading
 # Main title
 st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
 
-# Particles.js HTML configuration
+# Particles.js HTML configuration with fullscreen setup
 particles_js = """
 <!DOCTYPE html>
 <html lang="en">
@@ -16,10 +16,18 @@ particles_js = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Particles.js</title>
     <style>
-        #particles-js {
-            position: absolute;
+        html, body {
+            margin: 0;
+            padding: 0;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+        }
+        
+        #particles-js {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
             top: 0;
             left: 0;
             z-index: 0;
@@ -61,7 +69,7 @@ particles_js = """
                 }
             },
             "interactivity": {
-                "detect_on": "canvas",
+                "detect_on": "window",
                 "events": {
                     "onhover": {"enable": true, "mode": "grab"},
                     "onclick": {"enable": true, "mode": "repulse"},
@@ -75,15 +83,28 @@ particles_js = """
 </html>
 """
 
-# Inject particles.js
-components.html(particles_js, height=1000)
+# Inject particles.js with full height
+components.html(particles_js, height=3000, width=None)
 
-# Styling
+# Styling with full page adjustments
 st.markdown("""
     <style>
+        /* Full page styling */
         .stApp {
             background-color: #0E1117 !important;
             color: #E0E0E0 !important;
+            min-height: 100vh;
+            width: 100%;
+            overflow-x: hidden;
+        }
+        
+        /* Hide default Streamlit margins */
+        .main .block-container {
+            max-width: 100%;
+            padding-top: 1rem;
+            padding-right: 1rem;
+            padding-left: 1rem;
+            padding-bottom: 1rem;
         }
         
         /* Updated Sidebar Styling */
@@ -127,7 +148,7 @@ st.markdown("""
         }
 
         .section-card {
-            background: #1E1E1E !important;
+            background: rgba(30, 30, 30, 0.8) !important;
             color: #E0E0E0 !important;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
             border-radius: 15px;
@@ -135,12 +156,14 @@ st.markdown("""
             margin: 20px 0;
             border-left: 5px solid #3498db;
             transition: transform 0.3s ease;
+            position: relative;
+            z-index: 1;
         }
         
         .section-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
-            background: #2E2E2E !important;
+            background: rgba(46, 46, 46, 0.9) !important;
         }
 
         .section-header {
@@ -173,11 +196,16 @@ st.markdown("""
             color: #E0E0E0 !important;
             line-height: 1.6;
         }
+        
+        /* Adjust map container for full width */
+        .img-container img {
+            width: 80%;
+            max-width: 800px; /* Increased max-width */
+            margin: 20px auto;
+            display: block;
+        }
     </style>
 """, unsafe_allow_html=True)
-
-
-
 
 # Welcome animation (only on first load)
 if 'first_load' not in st.session_state:
@@ -189,13 +217,16 @@ if st.session_state.first_load:
     welcome_placeholder = st.empty()
     st.session_state.first_load = False
 
-# Map image
+# Map image with larger display
 st.markdown("""
     <div class="img-container" style="text-align: center;">
         <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
-             style="width: 80%; max-width: 500px; margin: 20px auto;">
+             style="width: 80%; max-width: 800px; margin: 20px auto;">
     </div>
 """, unsafe_allow_html=True)
+
+# Add container to better organize content
+st.container()
 
 # Sections content
 sections = {
@@ -222,7 +253,10 @@ The integration of automation in geospatial analysis significantly enhances the 
     "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely and informed decision-making. This tool, built on the experience of the 2023 SNT implementation, not only addresses existing operational challenges but also empowers analysts to focus on deriving insights rather than getting lost in technical details. The user-friendly interface and high processing speed make it an invaluable asset for regular SNT updates and monitoring of malaria control activities."""
 }
 
-# Display sections
+# Create columns for a more organized layout
+col1, col2 = st.columns([1, 3])
+
+# Display sections with improved layout
 for title, content in sections.items():
     st.markdown(f"""
         <div class="section-card">
