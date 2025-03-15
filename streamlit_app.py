@@ -4,119 +4,7 @@ import random
 import time
 import threading
 
-# Main title
-st.markdown("""
-<div class="full-width-title">
-    <h1>Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
-</div>
-""", unsafe_allow_html=True)
-
-# Adjust the CSS for the title to match the particles styling
-st.markdown("""
-    <style>
-        .full-width-title {
-            width: 100%;
-            text-align: center;
-            background-color: rgba(14, 17, 23, 0.8);
-            padding: 10px 0;
-            margin: 0;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .full-width-title h1 {
-            color: white !important;
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0;
-            padding: 0 15px;
-            line-height: 1.3;
-        }
-        
-        /* Make title responsive */
-        @media (max-width: 768px) {
-            .full-width-title h1 {
-                font-size: 1.8rem;
-            }
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# Modified particles.js HTML configuration - with 40% height and positioned at top
-particles_js = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Particles.js</title>
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-        }
-        
-        #particles-js {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 0;
-            background-color: transparent;
-        }
-    </style>
-</head>
-<body>
-    <div id="particles-js"></div>
-    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
-    <script>
-        particlesJS("particles-js", {
-            "particles": {
-                "number": {"value": 300, "density": {"enable": true, "value_area": 800}},
-                "color": {"value": "#ffffff"},
-                "shape": {"type": "circle"},
-                "opacity": {"value": 0.5, "random": false},
-                "size": {"value": 2, "random": true},
-                "line_linked": {
-                    "enable": true,
-                    "distance": 100,
-                    "color": "#ffffff",
-                    "opacity": 0.22,
-                    "width": 1
-                },
-                "move": {
-                    "enable": true,
-                    "speed": 0.2,
-                    "direction": "none",
-                    "random": false,
-                    "straight": false,
-                    "out_mode": "out",
-                    "bounce": true
-                }
-            },
-            "interactivity": {
-                "detect_on": "window",
-                "events": {
-                    "onhover": {"enable": true, "mode": "grab"},
-                    "onclick": {"enable": true, "mode": "repulse"},
-                    "resize": true
-                }
-            },
-            "retina_detect": true
-        });
-    </script>
-</body>
-</html>
-"""
-
-# Inject particles.js with reduced height to match 40% setting
-components.html(particles_js, height=600)
-
-# Styling
+# First, set up the CSS styling for the application
 st.markdown("""
     <style>
         .stApp {
@@ -247,8 +135,120 @@ st.markdown("""
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             border: 1px solid rgba(52, 152, 219, 0.3);
         }
+        
+        /* Improved title styling to make it more visible */
+        .full-width-title {
+            width: 100%;
+            text-align: center;
+            background-color: rgba(14, 17, 23, 0.8);
+            padding: 15px 0;
+            margin: 0 0 20px 0;
+            position: relative;
+            z-index: 100; /* Increased z-index to appear above particles */
+            border-bottom: 3px solid #3498db;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .full-width-title h1 {
+            color: white !important;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0;
+            padding: 0 15px;
+            line-height: 1.3;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Make title responsive */
+        @media (max-width: 768px) {
+            .full-width-title h1 {
+                font-size: 1.8rem;
+            }
+        }
     </style>
 """, unsafe_allow_html=True)
+
+# Modified particles.js HTML configuration - reduce height and position below title
+particles_js = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particles.js</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #particles-js {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 0; /* Lower z-index to stay behind content */
+            background-color: transparent;
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script>
+        particlesJS("particles-js", {
+            "particles": {
+                "number": {"value": 300, "density": {"enable": true, "value_area": 800}},
+                "color": {"value": "#ffffff"},
+                "shape": {"type": "circle"},
+                "opacity": {"value": 0.3, "random": false}, /* Reduced opacity for better visibility */
+                "size": {"value": 2, "random": true},
+                "line_linked": {
+                    "enable": true,
+                    "distance": 100,
+                    "color": "#ffffff",
+                    "opacity": 0.15, /* Reduced opacity */
+                    "width": 1
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 0.2,
+                    "direction": "none",
+                    "random": false,
+                    "straight": false,
+                    "out_mode": "out",
+                    "bounce": true
+                }
+            },
+            "interactivity": {
+                "detect_on": "window",
+                "events": {
+                    "onhover": {"enable": true, "mode": "grab"},
+                    "onclick": {"enable": true, "mode": "repulse"},
+                    "resize": true
+                }
+            },
+            "retina_detect": true
+        });
+    </script>
+</body>
+</html>
+"""
+
+# IMPORTANT: First display the title, then the particles
+# Main title - with improved visibility
+st.markdown("""
+<div class="full-width-title">
+    <h1>Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
+</div>
+""", unsafe_allow_html=True)
+
+# Now inject particles.js but with a reduced height
+components.html(particles_js, height=500)  # Reduced height from 600 to 500
 
 # No space between components and immediately show map image
 st.markdown("""
