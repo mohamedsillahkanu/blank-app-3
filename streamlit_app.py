@@ -1,11 +1,35 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import random
-import time
-import threading
 
-# Main title
-st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
+# Main title with animation and bluish-green color
+st.markdown("""
+    <style>
+        .animated-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00b894; /* Bluish green color */
+            text-align: center;
+            animation: pulse 2s infinite ease-in-out;
+            font-family: 'Arial', sans-serif;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+    <h1 class="animated-title">Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
+""", unsafe_allow_html=True)
 
 # Particles.js HTML configuration
 particles_js = """
@@ -78,7 +102,7 @@ particles_js = """
 # Inject particles.js
 components.html(particles_js, height=1000)
 
-# Styling
+# Styling for the app
 st.markdown("""
     <style>
         .stApp {
@@ -176,9 +200,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
-
-
 # Welcome animation (only on first load)
 if 'first_load' not in st.session_state:
     st.session_state.first_load = True
@@ -219,14 +240,22 @@ The integration of automation in geospatial analysis significantly enhances the 
     <div class='custom-bullet'>Data managers and decision-makers seeking to improve operational efficiency and responsiveness to health challenges.</div>
     <div class='custom-bullet'>Organizations interested in integrating automation into their workflows to enhance data-driven decision-making capabilities.</div>""",
     
-    "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely and informed decision-making. This tool, built on the experience of the 2023 SNT implementation, not only addresses existing operational challenges but also empowers analysts to focus on deriving insights rather than getting lost in technical details. The user-friendly interface and high processing speed make it an invaluable asset for regular SNT updates and monitoring of malaria control activities."""
+    "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely decision-making in malaria intervention strategies. This tool provides an invaluable resource that can facilitate data-driven decisions at the sub-national level, ultimately contributing to more effective and targeted interventions in malaria control efforts.""",
 }
 
-# Display sections
-for title, content in sections.items():
-    st.markdown(f"""
-        <div class="section-card">
-            <div class="section-header">{title}</div>
-            <div class="content-text">{content}</div>
+# Create section content cards
+for section, content in sections.items():
+    st.markdown(f"<div class='section-card'>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header'>{section}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='content-text'>{content}</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Add contact or further information section
+st.markdown("""
+    <div class='section-card'>
+        <div class='section-header'>Contact & Further Information</div>
+        <div class='content-text'>
+            For further information or queries, please contact us at <b>info@icfsl.org</b>.
         </div>
-    """, unsafe_allow_html=True)
+    </div>
+""", unsafe_allow_html=True)
