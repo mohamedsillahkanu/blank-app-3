@@ -5,115 +5,9 @@ import time
 import threading
 
 # Main title
-st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Intervention")
+st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
 
-# Add CSS for the title with margin, positioning and glittering effect
-st.markdown("""
-    <style>
-        /* Add margin to the top of the page and position the title */
-        .block-container {
-            padding-top: 30px !important;
-        }
-        
-        .full-width-title {
-            width: 100%;
-            text-align: center;
-            background-color: rgba(14, 17, 23, 0.8);
-            padding: 20px 0;
-            margin-top: 30px;
-            margin-bottom: 20px;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .full-width-title h1 {
-            color: white !important;
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0;
-            padding: 0 15px;
-            line-height: 1.3;
-            background: linear-gradient(
-                to right,
-                #3498db, #2ecc71, #f1c40f, #e74c3c, #9b59b6
-            );
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent !important;
-            animation: glitter 8s linear infinite, rainbow 4s linear infinite;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-            position: relative;
-        }
-        
-        /* Glittering text effect animation */
-        @keyframes glitter {
-            0% {
-                text-shadow: 0 0 5px rgba(255, 255, 255, 0.1),
-                             0 0 10px rgba(255, 255, 255, 0.1);
-            }
-            25% {
-                text-shadow: 0 0 10px rgba(255, 255, 255, 0.3),
-                             0 0 20px rgba(255, 255, 255, 0.3);
-            }
-            50% {
-                text-shadow: 0 0 15px rgba(255, 255, 255, 0.5),
-                             0 0 30px rgba(255, 255, 255, 0.5);
-            }
-            75% {
-                text-shadow: 0 0 10px rgba(255, 255, 255, 0.3),
-                             0 0 20px rgba(255, 255, 255, 0.3);
-            }
-            100% {
-                text-shadow: 0 0 5px rgba(255, 255, 255, 0.1),
-                             0 0 10px rgba(255, 255, 255, 0.1);
-            }
-        }
-        
-        /* Rainbow color shift animation */
-        @keyframes rainbow {
-            0% {
-                background-position: 0% 50%;
-            }
-            50% {
-                background-position: 100% 50%;
-            }
-            100% {
-                background-position: 0% 50%;
-            }
-        }
-        
-        /* Make title responsive */
-        @media (max-width: 768px) {
-            .full-width-title h1 {
-                font-size: 1.8rem;
-            }
-            .full-width-title {
-                padding: 15px 0;
-                margin-top: 20px;
-            }
-        }
-        
-        /* Ensure the title stands out against the particles */
-        .main-title-wrapper {
-            position: relative;
-            z-index: 2;
-            margin-top: 30px;
-            padding: 10px 20px;
-            background-color: rgba(14, 17, 23, 0.7);
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(52, 152, 219, 0.3);
-        }
-    </style>
-    
-    <!-- Custom title wrapper with glittering effect -->
-    <div class="main-title-wrapper">
-        <h1 class="full-width-title">Automated Geospatial Analysis for Sub-National Tailoring of Malaria Intervention</h1>
-    </div>
-""", unsafe_allow_html=True)
-
-# Modified particles.js HTML configuration - with 80% height and positioned at top
+# Particles.js HTML configuration
 particles_js = """
 <!DOCTYPE html>
 <html lang="en">
@@ -122,22 +16,19 @@ particles_js = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Particles.js</title>
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-        }
-        
         #particles-js {
             position: absolute;
             width: 100%;
-            height: 80%;
+            height: 100%;
             top: 0;
             left: 0;
-            right: 0;
             z-index: 0;
             background-color: transparent;
+        }
+        
+        .content {
+            position: relative;
+            z-index: 1;
         }
     </style>
 </head>
@@ -170,7 +61,7 @@ particles_js = """
                 }
             },
             "interactivity": {
-                "detect_on": "window",
+                "detect_on": "canvas",
                 "events": {
                     "onhover": {"enable": true, "mode": "grab"},
                     "onclick": {"enable": true, "mode": "repulse"},
@@ -184,8 +75,8 @@ particles_js = """
 </html>
 """
 
-# Inject particles.js with reduced height to match 80% setting
-components.html(particles_js, height=600)
+# Inject particles.js
+components.html(particles_js, height=1000)
 
 # Styling
 st.markdown("""
@@ -235,14 +126,8 @@ st.markdown("""
             z-index: 1;
         }
 
-        /* Adjusted padding to bring elements closer together but keep title space */
-        .e1f1d6gn1, .block-container {
-            padding-top: 0 !important;
-        }
-
-        /* Modified section card styling to be more transparent */
         .section-card {
-            background: rgba(30, 30, 30, 0.7) !important;
+            background: #1E1E1E !important;
             color: #E0E0E0 !important;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
             border-radius: 15px;
@@ -250,14 +135,12 @@ st.markdown("""
             margin: 20px 0;
             border-left: 5px solid #3498db;
             transition: transform 0.3s ease;
-            position: relative;
-            z-index: 1;
         }
         
         .section-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
-            background: rgba(46, 46, 46, 0.8) !important;
+            background: #2E2E2E !important;
         }
 
         .section-header {
@@ -290,60 +173,13 @@ st.markdown("""
             color: #E0E0E0 !important;
             line-height: 1.6;
         }
-        
-        /* Make content full-width */
-        .block-container {
-            max-width: 100% !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-        }
-        
-        /* Image container styling - positioned after title with proper spacing */
-        .img-container {
-            position: relative;
-            z-index: 1;
-            text-align: center;
-            margin: 30px auto 20px auto; /* Added more top margin */
-            background: rgba(14, 17, 23, 0.3);
-            border-radius: 15px;
-            padding: 5px 0; /* Reduced padding */
-            max-width: 90%;
-        }
-        
-        .img-container img {
-            width: 80%; 
-            max-width: 800px; 
-            margin: 0 auto;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(52, 152, 219, 0.3);
-        }
-        
-        /* Hide original Streamlit title */
-        .stMarkdown h1:first-child {
-            display: none;
-        }
-        
-        /* Spacing fixes */
-        .main-content {
-            margin-top: 80px;
-            position: relative;
-            z-index: 1;
-        }
     </style>
-    
-    <div class="main-content"></div>
 """, unsafe_allow_html=True)
 
-# No space between components and immediately show map image
-st.markdown("""
-    <div class="img-container">
-        <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
-             alt="Sierra Leone Map">
-    </div>
-""", unsafe_allow_html=True)
 
-# Welcome animation (only on first load) - moved after image
+
+
+# Welcome animation (only on first load)
 if 'first_load' not in st.session_state:
     st.session_state.first_load = True
 
@@ -352,6 +188,14 @@ if st.session_state.first_load:
     st.snow()
     welcome_placeholder = st.empty()
     st.session_state.first_load = False
+
+# Map image
+st.markdown("""
+    <div class="img-container" style="text-align: center;">
+        <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
+             style="width: 80%; max-width: 500px; margin: 20px auto;">
+    </div>
+""", unsafe_allow_html=True)
 
 # Sections content
 sections = {
