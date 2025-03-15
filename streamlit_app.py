@@ -12,8 +12,54 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Main title
-st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
+# Custom animated title with bluish-green color effect
+st.markdown("""
+    <div class="animated-title">
+        <h1>Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
+    </div>
+    
+    <style>
+        .animated-title h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            background: linear-gradient(90deg, #47B5FF, #00FFCA, #39B5E0, #0096FF);
+            background-size: 300% 300%;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: gradient-shift 8s ease infinite, float 3s ease-in-out infinite;
+            margin-bottom: 2rem;
+            padding: 0.5rem;
+            text-shadow: 0 0 10px rgba(0, 255, 200, 0.2);
+        }
+        
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        /* Make the title responsive */
+        @media (max-width: 768px) {
+            .animated-title h1 {
+                font-size: 1.8rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .animated-title h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # Particles.js HTML configuration with responsive settings
 particles_js = """
