@@ -5,7 +5,7 @@ import time
 import threading
 
 # Main title
-st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
+st.markdown("# Automated Geospatial Analysis <br> for <br> Sub-National Tailoring of Malaria Interventions", unsafe_allow_html=True)
 
 # Particles.js HTML configuration
 particles_js = """
