@@ -7,15 +7,21 @@ import threading
 # Main title
 st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Intervention")
 
-# Adjust the CSS for the title to 
+# Add CSS for the title with margin, positioning and glittering effect
 st.markdown("""
     <style>
+        /* Add margin to the top of the page and position the title */
+        .block-container {
+            padding-top: 30px !important;
+        }
+        
         .full-width-title {
             width: 100%;
             text-align: center;
             background-color: rgba(14, 17, 23, 0.8);
-            padding: 10px 0;
-            margin: 0;
+            padding: 20px 0;
+            margin-top: 30px;
+            margin-bottom: 20px;
             position: relative;
             z-index: 1;
         }
@@ -27,6 +33,53 @@ st.markdown("""
             margin: 0;
             padding: 0 15px;
             line-height: 1.3;
+            background: linear-gradient(
+                to right,
+                #3498db, #2ecc71, #f1c40f, #e74c3c, #9b59b6
+            );
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent !important;
+            animation: glitter 8s linear infinite, rainbow 4s linear infinite;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            position: relative;
+        }
+        
+        /* Glittering text effect animation */
+        @keyframes glitter {
+            0% {
+                text-shadow: 0 0 5px rgba(255, 255, 255, 0.1),
+                             0 0 10px rgba(255, 255, 255, 0.1);
+            }
+            25% {
+                text-shadow: 0 0 10px rgba(255, 255, 255, 0.3),
+                             0 0 20px rgba(255, 255, 255, 0.3);
+            }
+            50% {
+                text-shadow: 0 0 15px rgba(255, 255, 255, 0.5),
+                             0 0 30px rgba(255, 255, 255, 0.5);
+            }
+            75% {
+                text-shadow: 0 0 10px rgba(255, 255, 255, 0.3),
+                             0 0 20px rgba(255, 255, 255, 0.3);
+            }
+            100% {
+                text-shadow: 0 0 5px rgba(255, 255, 255, 0.1),
+                             0 0 10px rgba(255, 255, 255, 0.1);
+            }
+        }
+        
+        /* Rainbow color shift animation */
+        @keyframes rainbow {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
         }
         
         /* Make title responsive */
@@ -34,11 +87,33 @@ st.markdown("""
             .full-width-title h1 {
                 font-size: 1.8rem;
             }
+            .full-width-title {
+                padding: 15px 0;
+                margin-top: 20px;
+            }
+        }
+        
+        /* Ensure the title stands out against the particles */
+        .main-title-wrapper {
+            position: relative;
+            z-index: 2;
+            margin-top: 30px;
+            padding: 10px 20px;
+            background-color: rgba(14, 17, 23, 0.7);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(52, 152, 219, 0.3);
         }
     </style>
+    
+    <!-- Custom title wrapper with glittering effect -->
+    <div class="main-title-wrapper">
+        <h1 class="full-width-title">Automated Geospatial Analysis for Sub-National Tailoring of Malaria Intervention</h1>
+    </div>
 """, unsafe_allow_html=True)
 
-# Modified particles.js HTML configuration - with 40% height and positioned at top
+# Modified particles.js HTML configuration - with 80% height and positioned at top
 particles_js = """
 <!DOCTYPE html>
 <html lang="en">
@@ -109,7 +184,7 @@ particles_js = """
 </html>
 """
 
-# Inject particles.js with reduced height to match 40% setting
+# Inject particles.js with reduced height to match 80% setting
 components.html(particles_js, height=600)
 
 # Styling
@@ -160,7 +235,7 @@ st.markdown("""
             z-index: 1;
         }
 
-        /* Remove default padding to bring elements closer together */
+        /* Adjusted padding to bring elements closer together but keep title space */
         .e1f1d6gn1, .block-container {
             padding-top: 0 !important;
         }
@@ -223,12 +298,12 @@ st.markdown("""
             padding-right: 1rem !important;
         }
         
-        /* Image container styling - positioned close to particles */
+        /* Image container styling - positioned after title with proper spacing */
         .img-container {
             position: relative;
             z-index: 1;
             text-align: center;
-            margin: 0 auto; /* Reduced from previous version */
+            margin: 30px auto 20px auto; /* Added more top margin */
             background: rgba(14, 17, 23, 0.3);
             border-radius: 15px;
             padding: 5px 0; /* Reduced padding */
@@ -243,7 +318,21 @@ st.markdown("""
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             border: 1px solid rgba(52, 152, 219, 0.3);
         }
+        
+        /* Hide original Streamlit title */
+        .stMarkdown h1:first-child {
+            display: none;
+        }
+        
+        /* Spacing fixes */
+        .main-content {
+            margin-top: 80px;
+            position: relative;
+            z-index: 1;
+        }
     </style>
+    
+    <div class="main-content"></div>
 """, unsafe_allow_html=True)
 
 # No space between components and immediately show map image
