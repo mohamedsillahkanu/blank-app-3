@@ -1,35 +1,124 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import random
+import time
+import threading
 
-# Configure the page to use wide layout
-st.set_page_config(layout="wide")
+# Main title
+st.markdown("""
+<div class="full-width-title">
+    <h1>Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
+</div>
+""", unsafe_allow_html=True)
 
-# Set title with maximum visibility - using Streamlit's native title component
-st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
-
-# Custom CSS with improved title visibility
+# Adjust the CSS for the title to match the particles styling
 st.markdown("""
     <style>
-        /* Enhanced styling for title */
-        .stApp div[data-testid="stHeader"] {
-            display: none;  /* Hide the default header */
+        .full-width-title {
+            width: 100%;
+            text-align: center;
+            background-color: rgba(14, 17, 23, 0.8);
+            padding: 10px 0;
+            margin: 0;
+            position: relative;
+            z-index: 1;
         }
         
-        .stApp h1 {
+        .full-width-title h1 {
             color: white !important;
-            font-size: 2.5rem !important;
-            font-weight: bold !important;
-            text-align: center !important;
-            padding: 20px 10px !important;
-            background-color: rgba(14, 17, 23, 0.95) !important;
-            border-bottom: 3px solid #3498db !important;
-            margin-bottom: 25px !important;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5) !important;
-            position: relative !important;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0;
+            padding: 0 15px;
+            line-height: 1.3;
         }
         
-        /* General app styling */
+        /* Make title responsive */
+        @media (max-width: 768px) {
+            .full-width-title h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Modified particles.js HTML configuration - with 40% height and positioned at top
+particles_js = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particles.js</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #particles-js {
+            position: absolute;
+            width: 100%;
+            height: 40%;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 0;
+            background-color: transparent;
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script>
+        particlesJS("particles-js", {
+            "particles": {
+                "number": {"value": 300, "density": {"enable": true, "value_area": 800}},
+                "color": {"value": "#ffffff"},
+                "shape": {"type": "circle"},
+                "opacity": {"value": 0.5, "random": false},
+                "size": {"value": 2, "random": true},
+                "line_linked": {
+                    "enable": true,
+                    "distance": 100,
+                    "color": "#ffffff",
+                    "opacity": 0.22,
+                    "width": 1
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 0.2,
+                    "direction": "none",
+                    "random": false,
+                    "straight": false,
+                    "out_mode": "out",
+                    "bounce": true
+                }
+            },
+            "interactivity": {
+                "detect_on": "window",
+                "events": {
+                    "onhover": {"enable": true, "mode": "grab"},
+                    "onclick": {"enable": true, "mode": "repulse"},
+                    "resize": true
+                }
+            },
+            "retina_detect": true
+        });
+    </script>
+</body>
+</html>
+"""
+
+# Inject particles.js with reduced height to match 40% setting
+components.html(particles_js, height=600)
+
+# Styling
+st.markdown("""
+    <style>
         .stApp {
             background-color: #0E1117 !important;
             color: #E0E0E0 !important;
@@ -64,7 +153,7 @@ st.markdown("""
             border-color: #47B5FF !important;
         }
         
-        .stMarkdown, p, h2, h3 {
+        .stMarkdown, p, h1, h2, h3 {
             color: #E0E0E0 !important;
             position: relative;
             z-index: 1;
@@ -75,12 +164,12 @@ st.markdown("""
             z-index: 1;
         }
 
-        /* Remove default padding */
+        /* Remove default padding to bring elements closer together */
         .e1f1d6gn1, .block-container {
             padding-top: 0 !important;
         }
 
-        /* Section styling */
+        /* Modified section card styling to be more transparent */
         .section-card {
             background: rgba(30, 30, 30, 0.7) !important;
             color: #E0E0E0 !important;
@@ -138,15 +227,15 @@ st.markdown("""
             padding-right: 1rem !important;
         }
         
-        /* Image container styling */
+        /* Image container styling - positioned close to particles */
         .img-container {
             position: relative;
             z-index: 1;
             text-align: center;
-            margin: 0 auto;
+            margin: 0 auto; /* Reduced from previous version */
             background: rgba(14, 17, 23, 0.3);
             border-radius: 15px;
-            padding: 5px 0;
+            padding: 5px 0; /* Reduced padding */
             max-width: 90%;
         }
         
@@ -158,66 +247,10 @@ st.markdown("""
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             border: 1px solid rgba(52, 152, 219, 0.3);
         }
-        
-        /* Responsive title */
-        @media (max-width: 768px) {
-            .stApp h1 {
-                font-size: 1.8rem !important;
-            }
-        }
     </style>
 """, unsafe_allow_html=True)
 
-# Create a simplified particles.js implementation (added after title)
-particles_js = """
-<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none;">
-    <div id="particles-js" style="width: 100%; height: 100%;"></div>
-</div>
-<script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        particlesJS("particles-js", {
-            "particles": {
-                "number": {"value": 120, "density": {"enable": true, "value_area": 800}},
-                "color": {"value": "#ffffff"},
-                "shape": {"type": "circle"},
-                "opacity": {"value": 0.2, "random": false},
-                "size": {"value": 2, "random": true},
-                "line_linked": {
-                    "enable": true,
-                    "distance": 100,
-                    "color": "#ffffff",
-                    "opacity": 0.1,
-                    "width": 1
-                },
-                "move": {
-                    "enable": true,
-                    "speed": 0.2,
-                    "direction": "none",
-                    "random": false,
-                    "straight": false,
-                    "out_mode": "out",
-                    "bounce": true
-                }
-            },
-            "interactivity": {
-                "detect_on": "window",
-                "events": {
-                    "onhover": {"enable": true, "mode": "grab"},
-                    "onclick": {"enable": true, "mode": "repulse"},
-                    "resize": true
-                }
-            },
-            "retina_detect": true
-        });
-    });
-</script>
-"""
-
-# IMPORTANT: Use components.html (not st.components.html) with a minimal height
-components.html(particles_js, height=100)
-
-# Display map image
+# No space between components and immediately show map image
 st.markdown("""
     <div class="img-container">
         <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
@@ -225,20 +258,21 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Welcome animation (only on first load)
+# Welcome animation (only on first load) - moved after image
 if 'first_load' not in st.session_state:
     st.session_state.first_load = True
 
 if st.session_state.first_load:
     st.balloons()
     st.snow()
+    welcome_placeholder = st.empty()
     st.session_state.first_load = False
 
 # Sections content
 sections = {
     "Overview": """Before now, the Sub-National Tailoring (SNT) process took a considerable amount of time to complete analysis. Based on the experience of the 2023 SNT implementation, we have developed an automated tool using the same validated codes with additional enhanced features. This innovation aims to build the capacity of National Malaria Control Program (NMCP) to conduct SNT easily on a yearly basis and monitor activities effectively using this tool. The tool is designed to be user-friendly and offers high processing speed.
 
-The integration of automation in geospatial analysis significantly enhances the efficiency and effectiveness of data management and visualization tasks. With the introduction of this automated system, analysis time has been drastically reduced from one year to one week. This shift not only streamlines operations but also allows analysts to focus on interpreting results rather than getting lost in technical details.""",
+The integration of automation in geospatial analysis significantly enhances the efficiency and effectiveness of data management and visualization tasks. With the introduction of this automated system, analysis time has been drastically reduced from one year to one week. This shift not only streamlines operations but also allows analysts to focus on interpreting results rather than being bogged down by technical processes.""",
     
     "Objectives": """The main objectives of implementing automated systems for geospatial analysis and data management are:
     <div class='custom-bullet'>Reduce Time and Effort: Significantly decrease the time required to create maps and analyze data, enabling quicker decision-making.</div>
