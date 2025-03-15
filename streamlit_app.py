@@ -5,7 +5,11 @@ import time
 import threading
 
 # Main title
-st.markdown("# Automated Geospatial Analysis <br> for <br> Sub-National Tailoring of Malaria Interventions", unsafe_allow_html=True)
+st.markdown("""
+<div class="full-width-title">
+    <h1>Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
+</div>
+""", unsafe_allow_html=True)
 
 # Particles.js HTML configuration
 particles_js = """
