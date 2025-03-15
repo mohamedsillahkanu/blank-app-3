@@ -18,7 +18,7 @@ st.markdown("""
             width: 100%;
             text-align: center;
             background-color: rgba(14, 17, 23, 0.8);
-            padding: 20px 0;
+            padding: 10px 0;
             margin: 0;
             position: relative;
             z-index: 1;
@@ -42,7 +42,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Modified particles.js HTML configuration - now covers the whole page
+# Modified particles.js HTML configuration - with 40% height and positioned at top
 particles_js = """
 <!DOCTYPE html>
 <html lang="en">
@@ -59,13 +59,12 @@ particles_js = """
         }
         
         #particles-js {
-            position: fixed;
+            position: absolute;
             width: 100%;
-            height: 20%;
+            height: 40%;
             top: 0;
             left: 0;
             right: 0;
-            bottom: 0;
             z-index: 0;
             background-color: transparent;
         }
@@ -114,8 +113,8 @@ particles_js = """
 </html>
 """
 
-# Inject particles.js - use only height parameter
-components.html(particles_js, height=3000)
+# Inject particles.js with reduced height to match 40% setting
+components.html(particles_js, height=600)
 
 # Styling
 st.markdown("""
@@ -163,6 +162,11 @@ st.markdown("""
         .stButton, .stSelectbox, .stTextInput, .stHeader {
             position: relative;
             z-index: 1;
+        }
+
+        /* Remove default padding to bring elements closer together */
+        .e1f1d6gn1, .block-container {
+            padding-top: 0 !important;
         }
 
         /* Modified section card styling to be more transparent */
@@ -223,15 +227,15 @@ st.markdown("""
             padding-right: 1rem !important;
         }
         
-        /* Image container styling */
+        /* Image container styling - positioned close to particles */
         .img-container {
             position: relative;
             z-index: 1;
             text-align: center;
-            margin: 0 auto;
+            margin: 0 auto; /* Reduced from previous version */
             background: rgba(14, 17, 23, 0.3);
             border-radius: 15px;
-            padding: 20px 0;
+            padding: 5px 0; /* Reduced padding */
             max-width: 90%;
         }
         
@@ -246,7 +250,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Welcome animation (only on first load)
+# No space between components and immediately show map image
+st.markdown("""
+    <div class="img-container">
+        <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
+             alt="Sierra Leone Map">
+    </div>
+""", unsafe_allow_html=True)
+
+# Welcome animation (only on first load) - moved after image
 if 'first_load' not in st.session_state:
     st.session_state.first_load = True
 
@@ -255,14 +267,6 @@ if st.session_state.first_load:
     st.snow()
     welcome_placeholder = st.empty()
     st.session_state.first_load = False
-
-# Map image with updated container to allow particles to show through
-st.markdown("""
-    <div class="img-container">
-        <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
-             alt="Sierra Leone Map">
-    </div>
-""", unsafe_allow_html=True)
 
 # Sections content
 sections = {
