@@ -7,7 +7,7 @@ import threading
 # Main title
 st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
 
-# Particles.js HTML configuration with fullscreen setup
+# Particles.js HTML configuration
 particles_js = """
 <!DOCTYPE html>
 <html lang="en">
@@ -21,24 +21,18 @@ particles_js = """
             padding: 0;
             width: 100%;
             height: 100%;
-            overflow-x: hidden;
         }
         
         #particles-js {
             position: fixed;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
             z-index: 0;
             background-color: transparent;
-        }
-        
-        .content {
-            position: relative;
-            z-index: 1;
         }
     </style>
 </head>
@@ -85,45 +79,15 @@ particles_js = """
 </html>
 """
 
-# Inject particles.js with full width and height
-components.html(particles_js, height=3000, width="100%")
+# Inject particles.js - use only height parameter
+components.html(particles_js, height=3000)
 
-# Styling with full page adjustments
+# Styling
 st.markdown("""
     <style>
-        /* Full page styling */
         .stApp {
             background-color: #0E1117 !important;
             color: #E0E0E0 !important;
-            min-height: 100vh;
-            width: 100vw;
-            max-width: 100% !important;
-            overflow-x: hidden;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        
-        /* Hide default Streamlit margins and make full width */
-        .main .block-container {
-            max-width: 100% !important;
-            width: 100vw !important;
-            padding-top: 1rem;
-            padding-right: 0;
-            padding-left: 0;
-            padding-bottom: 1rem;
-            margin: 0 !important;
-        }
-        
-        /* Remove any fixed width constraints */
-        .st-emotion-cache-1n76uvr {
-            width: 100% !important;
-            max-width: none !important;
-        }
-        
-        /* Make sure report container is full width */
-        .reportview-container {
-            width: 100% !important;
-            max-width: 100% !important;
         }
         
         /* Updated Sidebar Styling */
@@ -216,12 +180,11 @@ st.markdown("""
             line-height: 1.6;
         }
         
-        /* Adjust map container for full width */
-        .img-container img {
-            width: 80%;
-            max-width: 800px; /* Increased max-width */
-            margin: 20px auto;
-            display: block;
+        /* Make content full-width */
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -236,16 +199,13 @@ if st.session_state.first_load:
     welcome_placeholder = st.empty()
     st.session_state.first_load = False
 
-# Map image with larger display
+# Map image
 st.markdown("""
     <div class="img-container" style="text-align: center;">
         <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
              style="width: 80%; max-width: 800px; margin: 20px auto;">
     </div>
 """, unsafe_allow_html=True)
-
-# Add container to better organize content
-st.container()
 
 # Sections content
 sections = {
@@ -272,10 +232,7 @@ The integration of automation in geospatial analysis significantly enhances the 
     "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely and informed decision-making. This tool, built on the experience of the 2023 SNT implementation, not only addresses existing operational challenges but also empowers analysts to focus on deriving insights rather than getting lost in technical details. The user-friendly interface and high processing speed make it an invaluable asset for regular SNT updates and monitoring of malaria control activities."""
 }
 
-# Use the full width for content
-st.markdown("<div style='width:100%; padding:0 10px;'>", unsafe_allow_html=True)
-
-# Display sections using full width
+# Display sections
 for title, content in sections.items():
     st.markdown(f"""
         <div class="section-card">
@@ -283,6 +240,3 @@ for title, content in sections.items():
             <div class="content-text">{content}</div>
         </div>
     """, unsafe_allow_html=True)
-
-# Close the full width container after all sections
-st.markdown("</div>", unsafe_allow_html=True)
