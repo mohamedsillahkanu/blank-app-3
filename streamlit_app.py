@@ -1,37 +1,21 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import random
+import time
+import threading
 
-# Main title with animation and bluish-green color
-st.markdown("""
-    <style>
-        .animated-title {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #00b894; /* Bluish green color */
-            text-align: center;
-            animation: pulse 2s infinite ease-in-out;
-            font-family: 'Arial', sans-serif;
-        }
+# Set page config to make it wide mode by default
+st.set_page_config(
+    page_title="Automated Geospatial Analysis for Malaria Interventions",
+    page_icon="🦟",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-                opacity: 1;
-            }
-            50% {
-                transform: scale(1.1);
-                opacity: 0.8;
-            }
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-    </style>
-    <h1 class="animated-title">Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions</h1>
-""", unsafe_allow_html=True)
+# Main title
+st.title("Automated Geospatial Analysis for Sub-National Tailoring of Malaria Interventions")
 
-# Particles.js HTML configuration
+# Particles.js HTML configuration with responsive settings
 particles_js = """
 <!DOCTYPE html>
 <html lang="en">
@@ -40,10 +24,17 @@ particles_js = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Particles.js</title>
     <style>
-        #particles-js {
-            position: absolute;
+        html, body {
+            margin: 0;
+            padding: 0;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+        }
+        #particles-js {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
             top: 0;
             left: 0;
             z-index: 0;
@@ -53,6 +44,7 @@ particles_js = """
         .content {
             position: relative;
             z-index: 1;
+            width: 100%;
         }
     </style>
 </head>
@@ -94,20 +86,54 @@ particles_js = """
             },
             "retina_detect": true
         });
+        
+        // Make particles responsive to window resize
+        window.addEventListener('resize', function() {
+            particlesJS('particles-js', particlesConfig);
+        });
     </script>
 </body>
 </html>
 """
 
-# Inject particles.js
+# Inject particles.js to fill the entire screen
 components.html(particles_js, height=1000)
 
-# Styling for the app
+# Styling with fullscreen responsive design
 st.markdown("""
     <style>
+        /* Reset and ensure full viewport usage */
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow-x: hidden;
+        }
+        
         .stApp {
             background-color: #0E1117 !important;
             color: #E0E0E0 !important;
+            width: 100vw !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow-x: hidden !important;
+        }
+        
+        /* Container modifications for full width */
+        .container {
+            max-width: 100% !important;
+            padding: 0 !important;
+        }
+        
+        /* Main content area */
+        .main .block-container {
+            max-width: 100% !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
         }
         
         /* Updated Sidebar Styling */
@@ -139,6 +165,7 @@ st.markdown("""
             border-color: #47B5FF !important;
         }
         
+        /* Content styling */
         .stMarkdown, p, h1, h2, h3 {
             color: #E0E0E0 !important;
             position: relative;
@@ -150,6 +177,7 @@ st.markdown("""
             z-index: 1;
         }
 
+        /* Responsive section cards */
         .section-card {
             background: #1E1E1E !important;
             color: #E0E0E0 !important;
@@ -159,6 +187,8 @@ st.markdown("""
             margin: 20px 0;
             border-left: 5px solid #3498db;
             transition: transform 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
         }
         
         .section-card:hover {
@@ -197,6 +227,56 @@ st.markdown("""
             color: #E0E0E0 !important;
             line-height: 1.6;
         }
+        
+        /* Make image responsive */
+        .img-container img {
+            width: 80%;
+            max-width: 500px;
+            margin: 20px auto;
+            display: block;
+            height: auto;
+        }
+        
+        /* Responsive design for different screen sizes */
+        @media (max-width: 768px) {
+            .section-card {
+                padding: 15px;
+                margin: 15px 0;
+            }
+            
+            .section-header {
+                font-size: 1.2rem;
+            }
+            
+            .img-container img {
+                width: 95%;
+            }
+            
+            .custom-bullet {
+                margin-left: 20px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .section-card {
+                padding: 10px;
+                margin: 10px 0;
+            }
+            
+            .section-header {
+                font-size: 1.1rem;
+            }
+            
+            .custom-bullet {
+                margin-left: 15px;
+                padding: 5px 0;
+            }
+            
+            .custom-bullet::before {
+                left: -15px;
+                font-size: 20px;
+            }
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -210,13 +290,16 @@ if st.session_state.first_load:
     welcome_placeholder = st.empty()
     st.session_state.first_load = False
 
-# Map image
+# Map image - make it responsive
 st.markdown("""
     <div class="img-container" style="text-align: center;">
         <img src="https://github.com/mohamedsillahkanu/si/raw/b0706926bf09ba23d8e90c394fdbb17e864121d8/Sierra%20Leone%20Map.png" 
-             style="width: 80%; max-width: 500px; margin: 20px auto;">
+             alt="Sierra Leone Map">
     </div>
 """, unsafe_allow_html=True)
+
+# Create columns for better responsive layout
+col1, col2 = st.columns([1, 1])
 
 # Sections content
 sections = {
@@ -240,22 +323,34 @@ The integration of automation in geospatial analysis significantly enhances the 
     <div class='custom-bullet'>Data managers and decision-makers seeking to improve operational efficiency and responsiveness to health challenges.</div>
     <div class='custom-bullet'>Organizations interested in integrating automation into their workflows to enhance data-driven decision-making capabilities.</div>""",
     
-    "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely decision-making in malaria intervention strategies. This tool provides an invaluable resource that can facilitate data-driven decisions at the sub-national level, ultimately contributing to more effective and targeted interventions in malaria control efforts.""",
+    "Conclusion": """The adoption of this automated system for SNT analysis represents a transformative opportunity for NMCPs. By significantly reducing the time and effort required for these tasks, programs can enhance their efficiency, improve the quality of their analyses, and ultimately lead to more timely and informed decision-making. This tool, built on the experience of the 2023 SNT implementation, not only addresses existing operational challenges but also empowers analysts to focus on deriving insights rather than getting lost in technical details. The user-friendly interface and high processing speed make it an invaluable asset for regular SNT updates and monitoring of malaria control activities."""
 }
 
-# Create section content cards
-for section, content in sections.items():
-    st.markdown(f"<div class='section-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='section-header'>{section}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='content-text'>{content}</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+# Distribute sections between columns for better responsive layout
+section_items = list(sections.items())
+half_length = len(section_items) // 2 + len(section_items) % 2  # Ensure even distribution
 
-# Add contact or further information section
+with col1:
+    for title, content in section_items[:half_length]:
+        st.markdown(f"""
+            <div class="section-card">
+                <div class="section-header">{title}</div>
+                <div class="content-text">{content}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+with col2:
+    for title, content in section_items[half_length:]:
+        st.markdown(f"""
+            <div class="section-card">
+                <div class="section-header">{title}</div>
+                <div class="content-text">{content}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+# Add a footer
 st.markdown("""
-    <div class='section-card'>
-        <div class='section-header'>Contact & Further Information</div>
-        <div class='content-text'>
-            For further information or queries, please contact us at <b>info@icfsl.org</b>.
-        </div>
+    <div style="text-align: center; margin-top: 40px; padding: 20px; border-top: 1px solid #333; position: relative; z-index: 1;">
+        <p style="color: #888;">© 2025 National Malaria Control Program. All rights reserved.</p>
     </div>
 """, unsafe_allow_html=True)
