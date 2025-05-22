@@ -129,8 +129,8 @@ def get_greeting():
         return "Good Evening"
 
 # Initialize session state for module navigation
-if 'current_module' not in st.session_state:
-    st.session_state.current_module = None
+    if 'current_module' not in st.session_state:
+      st.session_state.current_module = None
 
 # Function to safely import module without set_page_config issues
 def import_module_safely(module_path, module_name):
