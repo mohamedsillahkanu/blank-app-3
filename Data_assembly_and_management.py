@@ -275,9 +275,9 @@ def main():
     # Define the modules with their descriptions and icons
     modules = {
     "Combine_files.py": {"icon": "", "desc": "Merge multiple datasets into unified data structure"},
-    "Rename_columns.py": {"icon": "🏷", "desc": "Standardize and rename data columns for consistency"},
+    "Rename_columns.py": {"icon": "", "desc": "Standardize and rename data columns for consistency"},
     "Create_new_variables.py": {"icon": "", "desc": "Generate derived variables and calculated fields"},
-    "Outlier_detection_and_correction.py": {"icon": "", "desc": "Identify and handle data anomalies and outliers"},
+    "Outlier_detection_and_correction.py": {"icon": "", "desc": "Identify and handle data anomalies and outliers"}
 }
     # Get the correct pages directory path
     base_dir = os.path.abspath(os.path.dirname(__file__))
