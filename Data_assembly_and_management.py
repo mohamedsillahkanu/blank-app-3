@@ -245,7 +245,7 @@ def main():
     # Create header
     header_html = f"""
     <div class="dashboard-title">
-        <h1>🧊 SNT Dashboard</h1>
+        <h1>🧊 DATA ASSEMBLY AND MANAGEMENT</h1>
         <p>{get_greeting()} | {datetime.now().strftime("%A, %B %d, %Y")}</p>
     </div>
     """
