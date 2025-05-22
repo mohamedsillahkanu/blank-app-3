@@ -36,6 +36,18 @@ st.markdown("""
         align-items: center;
     }
     
+    .column-rename-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        gap: 1rem;
+    }
+    
+    .column-rename-left,
+    .column-rename-right {
+        flex: 1;
+    }
+    
     .stTextInput > div > div > input {
         background-color: white !important;
         color: black !important;
@@ -44,6 +56,15 @@ st.markdown("""
         padding: 1rem !important;
         border-radius: 10px !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        margin: 0.5rem 0 !important;
+    }
+    
+    .stTextInput > div {
+        margin-bottom: 0 !important;
+    }
+    
+    .stTextInput {
+        margin-bottom: 0 !important;
     }
     
     .column-type-badge {
