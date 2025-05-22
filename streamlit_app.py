@@ -179,7 +179,7 @@ def import_module_safely(module_path, module_name):
         return None
 
 # Function to create a card for each module
-def create_module_card(name, info, pages_dir):
+def create_module_card(name, info, base_dir):
     module_name = name.replace('.py', '').replace('_', ' ').title()
     
     card_html = f"""
@@ -192,7 +192,7 @@ def create_module_card(name, info, pages_dir):
     st.markdown(card_html, unsafe_allow_html=True)
     
     # Check if the module file exists
-    module_file_path = os.path.join(pages_dir, name)
+    module_file_path = os.path.join(base_dir, name)
     file_exists = os.path.exists(module_file_path)
     
     if not file_exists:
@@ -202,7 +202,7 @@ def create_module_card(name, info, pages_dir):
                  key=f"btn_{name}", 
                  disabled=not file_exists):
         st.session_state.current_module = name
-        st.experimental_rerun()
+        st.rerun()  # FIXED: Use st.rerun() instead of st.experimental_rerun()
 
 # Main function to run the dashboard
 def main():
@@ -220,29 +220,18 @@ def main():
     
     # If a module is selected, run it
     if st.session_state.current_module:
-        # Add a back button with custom styling
-        back_button_html = """
-        <button class="back-button" id="back-btn">← Back to Dashboard</button>
-        <script>
-            document.getElementById("back-btn").addEventListener("click", function() {
-                window.location.href = window.location.pathname;
-            });
-        </script>
-        """
-        st.markdown(back_button_html, unsafe_allow_html=True)
-        
-        if st.button("← Back", key="std_back_btn"):
+        # Add a back button
+        if st.button("← Back to Dashboard", key="std_back_btn"):
             st.session_state.current_module = None
-            st.experimental_rerun()
+            st.rerun()  # FIXED: Use st.rerun() instead of st.experimental_rerun()
         
         try:
             # Extract module name without .py extension
             module_name = st.session_state.current_module.replace('.py', '')
             
-            # Get the module path
+            # Get the module path from main directory
             base_dir = os.path.abspath(os.path.dirname(__file__))
-            pages_dir = os.path.join(base_dir, "pages")
-            module_path = os.path.join(pages_dir, st.session_state.current_module)
+            module_path = os.path.join(base_dir, st.session_state.current_module)
             
             # Display module title
             st.markdown(f"<h2>{module_name.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
@@ -274,30 +263,29 @@ def main():
     
     # Define the modules with their descriptions and icons
     modules = {
-        "Data_assembly_and_management.py": {"icon": "", "desc": "Assembly datasets and manage data preprocessing workflows"},
-        "Epidemiological_stratification.py": {"icon": "", "desc": "Analyze epidemiological data and identify patterns"},
-        "Review_of_past_interventions.py": {"icon": "", "desc": "Evaluate the effectiveness of previous health interventions"},
-        "Intervention_targeting.py": {"icon": "", "desc": "Plan and optimize new health intervention strategies"}
+        "Data_assembly_and_management.py": {"icon": "📊", "desc": "Assembly datasets and manage data preprocessing workflows"},
+        "Epidemiological_stratification.py": {"icon": "🔬", "desc": "Analyze epidemiological data and identify patterns"},
+        "Review_of_past_interventions.py": {"icon": "📋", "desc": "Evaluate the effectiveness of previous health interventions"},
+        "Intervention_targeting.py": {"icon": "🎯", "desc": "Plan and optimize new health intervention strategies"}
     }
     
-    # Get the correct pages directory path
+    # Get the main directory path (same directory as this file)
     base_dir = os.path.abspath(os.path.dirname(__file__))
-
     
     # Create 2 columns
     col1, col2 = st.columns(2)
     
-    # Arrange modules in 2 columns and 3 rows
+    # Arrange modules in 2 columns
     module_list = list(modules.items())
     
-    # First column - 3 modules
+    # First column - modules 0, 2
     with col1:
         for i in range(0, len(module_list), 2):
             if i < len(module_list):
                 name, info = module_list[i]
                 create_module_card(name, info, base_dir)
     
-    # Second column - 3 modules
+    # Second column - modules 1, 3
     with col2:
         for i in range(1, len(module_list), 2):
             if i < len(module_list):
