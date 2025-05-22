@@ -132,52 +132,84 @@ def get_greeting():
 if 'current_module' not in st.session_state:
     st.session_state.current_module = None
 
-# Function to safely import module without set_page_config issues
-def import_module_safely(module_path, module_name):
-    
-
+# Function to safely import and execute module
+def import_and_run_module(module_path, module_name):
     try:
+        # Check if file exists
+        if not os.path.exists(module_path):
+            st.error(f"Module file not found: {module_path}")
+            return False
+        
         # Read the module content
-        with open(module_path, 'r') as file:
+        with open(module_path, 'r', encoding='utf-8') as file:
             source_code = file.read()
         
-        # Modify the source code to remove st.set_page_config call
-        modified_code = []
-        skip_line = False
-        inside_config = False
+        # Remove or comment out st.set_page_config calls
+        lines = source_code.split('\n')
+        modified_lines = []
+        skip_config = False
         
-        for line in source_code.split('\n'):
-            if "st.set_page_config" in line:
-                skip_line = True
-                inside_config = True
+        for line in lines:
+            stripped_line = line.strip()
+            
+            # Check for st.set_page_config
+            if 'st.set_page_config' in line:
+                # Comment out the line instead of removing it
+                modified_lines.append(f"# {line}")
+                # Check if it's a multi-line config
+                if '(' in line and ')' not in line:
+                    skip_config = True
                 continue
             
-            if inside_config:
-                if ")" in line:
-                    inside_config = False
-                    skip_line = False
-                    continue
+            # Skip lines until we find the closing parenthesis
+            if skip_config:
+                modified_lines.append(f"# {line}")
+                if ')' in line:
+                    skip_config = False
+                continue
             
-            if not skip_line:
-                modified_code.append(line)
+            modified_lines.append(line)
         
-        # Create a new module
-        module = types.ModuleType(module_name)
+        modified_code = '\n'.join(modified_lines)
         
-        # Set the module's __file__ attribute
-        module.__file__ = module_path
+        # Create a temporary module namespace
+        module_globals = {
+            '__name__': module_name,
+            '__file__': module_path,
+            'st': st,  # Make sure streamlit is available
+        }
         
-        # Add the module to sys.modules
-        sys.modules[module_name] = module
+        # Add other common imports that might be needed
+        import pandas as pd
+        import numpy as np
+        module_globals.update({
+            'pd': pd,
+            'np': np,
+            'os': os,
+            'sys': sys,
+        })
         
-        # Execute the modified code in the module's namespace
-        exec('\n'.join(modified_code), module.__dict__)
+        # Execute the module code
+        exec(modified_code, module_globals)
         
-        return module
-    
+        # Try to call main functions if they exist
+        if 'main' in module_globals and callable(module_globals['main']):
+            module_globals['main']()
+        elif 'run' in module_globals and callable(module_globals['run']):
+            module_globals['run']()
+        
+        return True
+        
     except Exception as e:
-        st.error(f"Error loading module: {str(e)}")
-        return None
+        st.error(f"Error loading module '{module_name}': {str(e)}")
+        st.error(f"Error type: {type(e).__name__}")
+        
+        # Show more detailed error information in an expander
+        with st.expander("Show detailed error information"):
+            import traceback
+            st.code(traceback.format_exc())
+        
+        return False
 
 # Function to create a card for each module
 def create_module_card(name, info, base_dir):
@@ -203,7 +235,7 @@ def create_module_card(name, info, base_dir):
                  key=f"btn_{name}", 
                  disabled=not file_exists):
         st.session_state.current_module = name
-        st.rerun()  # FIXED: Use st.rerun() instead of st.experimental_rerun()
+        st.rerun()
 
 # Main function to run the dashboard
 def main():
@@ -224,42 +256,26 @@ def main():
         # Add a back button
         if st.button("← Back to Dashboard", key="std_back_btn"):
             st.session_state.current_module = None
-            st.rerun()  # FIXED: Use st.rerun() instead of st.experimental_rerun()
+            st.rerun()
         
-        try:
-            # Extract module name without .py extension
-            module_name = st.session_state.current_module.replace('.py', '')
+        # Display module title
+        module_display_name = st.session_state.current_module.replace('.py', '').replace('_', ' ').title()
+        st.markdown(f"<h2>{module_display_name}</h2>", unsafe_allow_html=True)
+        
+        # Get the module path from main directory
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        module_path = os.path.join(base_dir, st.session_state.current_module)
+        
+        # Import and run the module
+        module_name = st.session_state.current_module.replace('.py', '')
+        success = import_and_run_module(module_path, module_name)
+        
+        if not success:
+            st.error("Failed to load the module. Please check the file and try again.")
             
-            # Get the module path from main directory
-            base_dir = os.path.abspath(os.path.dirname(__file__))
-            module_path = os.path.join(base_dir, st.session_state.current_module)
-            
-            # Display module title
-            st.markdown(f"<h2>{module_name.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
-            
-            # Import the module safely (without set_page_config issues)
-            module = import_module_safely(module_path, module_name)
-            
-            if module:
-                # Try to run the module
-                # First, try to call the run() function if it exists
-                if hasattr(module, 'run'):
-                    module.run()
-                # If not, try to find a main() function
-                elif hasattr(module, 'main'):
-                    module.main()
-                # If none of those work, we'll assume the module has already executed its code
-                else:
-                    st.warning(f"Module {module_name} doesn't have a run() or main() function, but its code has been executed.")
-            else:
-                st.error(f"Failed to load module: {st.session_state.current_module}")
-            
-            return
-        except Exception as e:
-            st.error(f"Error running module: {str(e)}")
-            st.write(f"Details: {type(e).__name__}: {str(e)}")
+        return
     
-    # Otherwise, show the main dashboard with the modules in 2 columns and 3 rows
+    # Otherwise, show the main dashboard with the modules in 2 columns
     st.markdown("<h2>Select a Section</h2>", unsafe_allow_html=True)
     
     # Define the modules with their descriptions and icons
@@ -272,6 +288,19 @@ def main():
     
     # Get the main directory path (same directory as this file)
     base_dir = os.path.abspath(os.path.dirname(__file__))
+    
+    # Display current directory for debugging
+    with st.expander("Debug Information"):
+        st.write(f"Current working directory: {os.getcwd()}")
+        st.write(f"Base directory: {base_dir}")
+        st.write("Files in base directory:")
+        try:
+            files = os.listdir(base_dir)
+            for file in files:
+                if file.endswith('.py'):
+                    st.write(f"  - {file}")
+        except Exception as e:
+            st.write(f"Error listing files: {e}")
     
     # Create 2 columns
     col1, col2 = st.columns(2)
