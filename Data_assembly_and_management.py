@@ -202,7 +202,7 @@ def create_module_card(name, info, pages_dir):
                  key=f"btn_{name}", 
                  disabled=not file_exists):
         st.session_state.current_module = name
-        st.experimental_rerun()
+        st.rerun()  # Changed from st.experimental_rerun()
 
 # Main function to run the dashboard
 def main():
@@ -233,7 +233,7 @@ def main():
         
         if st.button("← Back", key="std_back_btn"):
             st.session_state.current_module = None
-            st.experimental_rerun()
+            st.rerun()  # Changed from st.experimental_rerun()
         
         try:
             # Extract module name without .py extension
@@ -274,11 +274,12 @@ def main():
     
     # Define the modules with their descriptions and icons
     modules = {
-    "Combine_files.py": {"icon": "", "desc": "Merge multiple datasets into unified data structure"},
-    "Rename_columns.py": {"icon": "", "desc": "Standardize and rename data columns for consistency"},
-    "Create_new_variables.py": {"icon": "", "desc": "Generate derived variables and calculated fields"},
-    "Outlier_detection_and_correction.py": {"icon": "", "desc": "Identify and handle data anomalies and outliers"}
-}
+        "Combine_files.py": {"icon": "🔗", "desc": "Merge multiple datasets into unified data structure"},
+        "Rename_columns.py": {"icon": "🏷️", "desc": "Standardize and rename data columns for consistency"},
+        "Create_new_variables.py": {"icon": "⚡", "desc": "Generate derived variables and calculated fields"},
+        "Outlier_detection_and_correction.py": {"icon": "🎯", "desc": "Identify and handle data anomalies and outliers"}
+    }
+    
     # Get the correct pages directory path
     base_dir = os.path.abspath(os.path.dirname(__file__))
 
