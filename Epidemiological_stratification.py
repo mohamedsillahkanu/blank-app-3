@@ -126,7 +126,6 @@ def get_greeting():
         return "Good Afternoon"
     else:
         return "Good Evening"
-
 # Initialize session state for module navigation
 if 'current_module' not in st.session_state:
     st.session_state.current_module = None
