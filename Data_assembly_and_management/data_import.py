@@ -74,6 +74,15 @@ st.markdown("""
         border: 1px solid #ffeaa7;
         margin: 1rem 0;
     }
+    
+    .upload-section {
+        background-color: #f8f9fa;
+        padding: 2rem;
+        border-radius: 10px;
+        border: 2px dashed #667eea;
+        text-align: center;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -146,9 +155,14 @@ def apply_all_computations():
     
     return computed_df
 
-# Sidebar for file upload
-with st.sidebar:
-    st.header("📁 File Upload")
+# File upload section in main area
+if st.session_state.df is None:
+    st.markdown("""
+    <div class="upload-section">
+        <h3>📁 Upload Your Data File</h3>
+        <p>Upload a CSV or Excel file to get started with computing new variables</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader(
         "Choose a file",
@@ -175,44 +189,67 @@ with st.sidebar:
             st.session_state.computations_applied = False
             
             st.success(f"✅ File uploaded successfully!")
-            st.info(f"📊 **File:** {uploaded_file.name}")
-            st.info(f"📏 **Shape:** {df.shape[0]} rows × {df.shape[1]} columns")
             
-            # Show numeric columns info
-            numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
-            st.info(f"🔢 **Numeric columns:** {len(numeric_cols)}")
+            # Show file info
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.info(f"📊 **File:** {uploaded_file.name}")
+            with col2:
+                st.info(f"📏 **Shape:** {df.shape[0]} rows × {df.shape[1]} columns")
+            with col3:
+                numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+                st.info(f"🔢 **Numeric columns:** {len(numeric_cols)}")
+            
+            st.rerun()
             
         except Exception as e:
             st.error(f"❌ Error reading file: {str(e)}")
     
-    # Option to use sample data if no file is uploaded
-    if st.session_state.df is None and st.button("📊 Use Sample Data"):
-        # Create sample data
-        sample_data = {
-            'Variable A': [10, 15, 8, 12, 20],
-            'Variable B': [5, 8, 3, 9, 15],
-            'Variable C': [7, 12, 9, 14, 6],
-            'Variable D': [3, 6, 9, 12, 15],
-            'Variable E': [20, 15, 10, 5, 0]
-        }
-        df = pd.DataFrame(sample_data)
-        
-        # Store in session state
-        st.session_state.df = df
-        st.session_state.original_df = df.copy()
-        
-        # Reset computations
-        st.session_state.computations = []
-        st.session_state.used_variables = set()
-        st.session_state.computed_df = None
-        st.session_state.computations_applied = False
-        
-        st.success(f"✅ Sample data loaded successfully!")
-        st.rerun()
+    # Show features when no file is uploaded
+    st.subheader("✨ Tool Features")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **📊 Computation Options:**
+        - **Addition:** Sum multiple variables together
+        - **Subtraction:** Subtract one variable from another
+        - **Smart handling:** Negative results become zero
+        - **Batch creation:** Set up multiple variables at once
+        """)
+    
+    with col2:
+        st.markdown("""
+        **🔒 Smart Constraints:**
+        - Variables are used only once across all computations
+        - Subtraction requires exactly 2 variables
+        - Addition allows multiple variables
+        - Automatic validation and error checking
+        """)
 
-# Main content
+# Main content when file is uploaded
 if st.session_state.df is not None:
     df = st.session_state.df
+    
+    # Show current file info in sidebar
+    with st.sidebar:
+        st.header("📊 Current File")
+        st.info(f"**Rows:** {df.shape[0]}")
+        st.info(f"**Columns:** {df.shape[1]}")
+        numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+        st.info(f"**Numeric columns:** {len(numeric_cols)}")
+        
+        if st.button("🔄 Upload New File"):
+            # Reset everything
+            st.session_state.df = None
+            st.session_state.original_df = None
+            st.session_state.num_computations = 0
+            st.session_state.computations = []
+            st.session_state.used_variables = set()
+            st.session_state.computed_df = None
+            st.session_state.computations_applied = False
+            st.rerun()
     
     # Step 1: Ask for number of variables to compute
     if not st.session_state.computations:
@@ -459,39 +496,6 @@ if st.session_state.df is not None:
             st.session_state.computed_df = None
             st.session_state.computations_applied = False
             st.rerun()
-
-else:
-    # Show instructions when no file is uploaded
-    st.markdown("""
-    <div style="border: 2px dashed #ccc; border-radius: 10px; padding: 2rem; text-align: center; background-color: #f8f9fa; margin: 1rem 0;">
-        <h3>📁 No file uploaded yet</h3>
-        <p>Please upload a CSV or Excel file using the sidebar to get started.</p>
-        <p>Alternatively, you can use the sample data option in the sidebar.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Show features
-    st.subheader("✨ Tool Features")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        **📊 Computation Options:**
-        - **Addition:** Sum multiple variables together
-        - **Subtraction:** Subtract one variable from another
-        - **Smart handling:** Negative results become zero
-        - **Batch creation:** Set up multiple variables at once
-        """)
-    
-    with col2:
-        st.markdown("""
-        **🔒 Smart Constraints:**
-        - Variables are used only once across all computations
-        - Subtraction requires exactly 2 variables
-        - Addition allows multiple variables
-        - Automatic validation and error checking
-        """)
 
 # Footer
 st.markdown("---")
