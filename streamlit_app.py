@@ -295,7 +295,7 @@ def main():
         for i in range(0, len(module_list), 2):
             if i < len(module_list):
                 name, info = module_list[i]
-                create_module_card(name, info, pages_dir)
+                create_module_card(name, info, base_dir)
     
     # Second column - 3 modules
     with col2:
