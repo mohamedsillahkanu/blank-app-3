@@ -9,7 +9,7 @@ from datetime import datetime
 # Set page configuration for the main dashboard
 st.set_page_config(
     page_title="SNT Dashboard",
-    page_icon="🧊",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -332,7 +332,7 @@ def main():
     # Create header
     header_html = f"""
     <div class="dashboard-title">
-        <h1>🧊 SNT Dashboard</h1>
+        <h1>SNT Dashboard</h1>
         <p>{get_greeting()} | {datetime.now().strftime("%A, %B %d, %Y")}</p>
     </div>
     """
@@ -419,10 +419,10 @@ def main():
     
     # Define the main modules with their descriptions and icons
     modules = {
-        "Data_assembly_and_management.py": {"icon": "📊", "desc": "Assembly datasets and manage data preprocessing workflows"},
-        "Epidemiological_stratification.py": {"icon": "🔬", "desc": "Analyze epidemiological data and identify patterns"},
-        "Review_of_past_interventions.py": {"icon": "📋", "desc": "Evaluate the effectiveness of previous health interventions"},
-        "Intervention_targeting.py": {"icon": "🎯", "desc": "Plan and optimize new health intervention strategies"}
+        "Data_assembly_and_management.py": {"icon": "", "desc": "Assembly datasets and manage data preprocessing workflows"},
+        "Epidemiological_stratification.py": {"icon": "", "desc": "Analyze epidemiological data and identify patterns"},
+        "Review_of_past_interventions.py": {"icon": "", "desc": "Evaluate the effectiveness of previous health interventions"},
+        "Intervention_targeting.py": {"icon": "", "desc": "Plan and optimize new health intervention strategies"}
     }
     
     # Create 2 columns
