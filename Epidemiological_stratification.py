@@ -7,7 +7,7 @@ from datetime import datetime
 # Set page configuration
 st.set_page_config(
     page_title="SNT Dashboard",
-    page_icon="🧊",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -54,10 +54,6 @@ def get_css():
             transform: translateY(-5px);
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
         }}
-        .module-icon {{
-            font-size: 24px;
-            margin-right: 10px;
-        }}
         .footer {{
             background-color: {COLORS["primary"]};
             padding: 15px;
@@ -97,13 +93,13 @@ def get_greeting():
 if 'current_module' not in st.session_state:
     st.session_state.current_module = None
 
-# Safe import to avoid re-set_page_config errors
+# Safe import to avoid st.set_page_config issues
 def import_module_safely(module_path, module_name):
     """
-    Import a module from file path while removing st.set_page_config
+    Import a module from file path while removing st.set_page_config and non-ASCII characters.
     """
     try:
-        with open(module_path, 'r') as file:
+        with open(module_path, 'r', encoding='utf-8') as file:
             source_code = file.read()
 
         modified_code = []
@@ -120,7 +116,8 @@ def import_module_safely(module_path, module_name):
                 inside_config = False
                 continue
             if not skip_line:
-                modified_code.append(line)
+                clean_line = line.encode('ascii', 'ignore').decode()
+                modified_code.append(clean_line)
 
         module = types.ModuleType(module_name)
         module.__file__ = module_path
@@ -137,7 +134,7 @@ def create_module_card(name, info, base_dir):
     module_name = name.replace('.py', '').replace('_', ' ').title()
     card_html = f"""
     <div class="module-card">
-        <h3><span class="module-icon">{info['icon']}</span>{module_name}</h3>
+        <h3>{module_name}</h3>
         <p>{info['desc']}</p>
     </div>
     """
@@ -159,7 +156,7 @@ def main():
 
     st.markdown(f"""
     <div class="dashboard-title">
-        <h1>🧊 SNT Dashboard</h1>
+        <h1>SNT Dashboard</h1>
         <p>{get_greeting()} | {datetime.now().strftime("%A, %B %d, %Y")}</p>
     </div>
     """, unsafe_allow_html=True)
@@ -192,24 +189,20 @@ def main():
             st.error(f"Error running module: {str(e)}")
             st.write(f"Details: {type(e).__name__}: {str(e)}")
 
-    # Main dashboard view with modules
+    # Show cards
     st.markdown("<h2>Select a Section</h2>", unsafe_allow_html=True)
 
     modules = {
         "Data_assembly_and_management.py": {
-            "icon": "📊",
             "desc": "Assemble datasets and manage data preprocessing workflows"
         },
         "Epidemiological_stratification.py": {
-            "icon": "📈",
             "desc": "Analyze epidemiological data and identify patterns"
         },
         "Review_of_past_interventions.py": {
-            "icon": "🔍",
             "desc": "Evaluate the effectiveness of previous health interventions"
         },
         "Intervention_targeting.py": {
-            "icon": "🎯",
             "desc": "Plan and optimize new health intervention strategies"
         }
     }
@@ -236,6 +229,6 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-# Run the app
+# Run app
 if __name__ == "__main__":
     main()
