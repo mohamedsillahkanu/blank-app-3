@@ -1,0 +1,926 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import io
+from datetime import datetime
+from typing import List, Dict, Tuple
+from scipy import stats
+
+# Set page config
+st.set_page_config(
+    page_title="Advanced Outlier Detection & Correction Tool",
+    page_icon="🎯",
+    layout="wide"
+)
+
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        text-align: center;
+        padding: 2rem 0;
+        background: linear-gradient(90deg, #8E24AA 0%, #3F51B5 100%);
+        color: white;
+        margin: -1rem -1rem 2rem -1rem;
+        border-radius: 0 0 1rem 1rem;
+    }
+    
+    .selection-card {
+        background-color: white;
+        color: black;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        border: 1px solid #ddd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        height: 400px;
+    }
+    
+    .method-card {
+        background-color: white;
+        color: black;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        border: 1px solid #ddd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .method-badge {
+        display: inline-block;
+        background-color: #8E24AA;
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 15px;
+        font-weight: bold;
+        font-size: 0.8rem;
+        margin: 0.2rem;
+    }
+    
+    .method-badge.mean {
+        background-color: #4CAF50;
+    }
+    
+    .method-badge.median {
+        background-color: #FF9800;
+    }
+    
+    .method-badge.moving-avg {
+        background-color: #3F51B5;
+    }
+    
+    .method-badge.winsorized {
+        background-color: #E91E63;
+    }
+    
+    .outlier-stats {
+        background-color: #fff3e0;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #FF9800;
+        margin: 1rem 0;
+    }
+    
+    .group-summary {
+        background-color: #e3f2fd;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #2196F3;
+        margin: 0.5rem 0;
+    }
+    
+    .correction-summary {
+        background-color: #e8f5e8;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #4CAF50;
+        margin: 0.5rem 0;
+    }
+    
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 1rem;
+        border-radius: 10px;
+        border: 1px solid #c3e6cb;
+        margin: 1rem 0;
+    }
+    
+    .warning-message {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 1rem;
+        border-radius: 10px;
+        border: 1px solid #ffeaa7;
+        margin: 1rem 0;
+    }
+    
+    .upload-section {
+        background-color: #f8f9fa;
+        padding: 2rem;
+        border-radius: 10px;
+        border: 2px dashed #8E24AA;
+        text-align: center;
+        margin: 1rem 0;
+    }
+    
+    .stats-card {
+        background-color: #fff;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+        border-top: 3px solid #8E24AA;
+    }
+    
+    .section-header {
+        background-color: #f5f5f5;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #8E24AA;
+        margin: 1rem 0;
+        font-weight: bold;
+    }
+    
+    .stSelectbox > div > div > div {
+        background-color: white !important;
+        color: black !important;
+    }
+    
+    .stMultiSelect > div > div > div {
+        background-color: white !important;
+        color: black !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Header
+st.markdown("""
+<div class="main-header">
+    <h1>🎯 Advanced Outlier Detection & Correction Tool</h1>
+    <p>Group-based outlier detection with Mean, Median, Moving Average, and Winsorization methods</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Initialize session state
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'original_df' not in st.session_state:
+    st.session_state.original_df = None
+if 'corrected_df' not in st.session_state:
+    st.session_state.corrected_df = None
+if 'outlier_results' not in st.session_state:
+    st.session_state.outlier_results = {}
+if 'correction_applied' not in st.session_state:
+    st.session_state.correction_applied = False
+
+def read_file(uploaded_file):
+    """Read uploaded file and return DataFrame"""
+    try:
+        file_extension = uploaded_file.name.lower().split('.')[-1]
+        
+        if file_extension == 'csv':
+            df = pd.read_csv(uploaded_file)
+        elif file_extension in ['xls', 'xlsx']:
+            df = pd.read_excel(uploaded_file)
+        else:
+            raise ValueError(f"Unsupported file type: {file_extension}")
+        
+        return df
+    except Exception as e:
+        st.error(f"Error reading file {uploaded_file.name}: {str(e)}")
+        return None
+
+def get_numeric_columns(df):
+    """Get only numeric columns from the dataframe"""
+    return df.select_dtypes(include=[np.number]).columns.tolist()
+
+def get_categorical_columns(df):
+    """Get categorical columns suitable for grouping"""
+    # Include object types and low-cardinality numeric columns
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    # Add numeric columns with low unique values (potential categorical)
+    for col in df.select_dtypes(include=[np.number]).columns:
+        if df[col].nunique() <= 20:  # Threshold for considering as categorical
+            categorical_cols.append(col)
+    
+    return categorical_cols
+
+def detect_outliers_iqr(data, multiplier=1.5):
+    """Detect outliers using IQR method"""
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    outliers = (data < lower_bound) | (data > upper_bound)
+    return outliers, lower_bound, upper_bound
+
+def detect_outliers_zscore(data, threshold=3):
+    """Detect outliers using Z-score method"""
+    if len(data.dropna()) == 0:
+        return pd.Series(False, index=data.index)
+    
+    z_scores = np.abs(stats.zscore(data.dropna()))
+    outliers = pd.Series(False, index=data.index)
+    outliers.loc[data.dropna().index] = z_scores > threshold
+    return outliers
+
+def correct_outliers_mean(data, outliers, group_data=None):
+    """Replace outliers with mean"""
+    corrected = data.copy()
+    if group_data is not None and len(group_data.dropna()) > 0:
+        replacement_value = group_data.mean()
+    else:
+        replacement_value = data.mean()
+    
+    corrected[outliers] = replacement_value
+    return corrected
+
+def correct_outliers_median(data, outliers, group_data=None):
+    """Replace outliers with median"""
+    corrected = data.copy()
+    if group_data is not None and len(group_data.dropna()) > 0:
+        replacement_value = group_data.median()
+    else:
+        replacement_value = data.median()
+    
+    corrected[outliers] = replacement_value
+    return corrected
+
+def correct_outliers_moving_average(data, outliers, window=5):
+    """Replace outliers with moving average"""
+    corrected = data.copy()
+    moving_avg = data.rolling(window=window, center=True, min_periods=1).mean()
+    corrected[outliers] = moving_avg[outliers]
+    return corrected
+
+def winsorize_data(data, limits=(0.05, 0.05)):
+    """Apply Winsorization to the data"""
+    from scipy.stats import mstats
+    corrected = data.copy()
+    non_null_mask = ~data.isna()
+    
+    if non_null_mask.sum() > 0:
+        winsorized_values = mstats.winsorize(data.dropna(), limits=limits)
+        corrected.loc[non_null_mask] = winsorized_values
+    
+    return corrected
+
+def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_method, detection_method, **kwargs):
+    """Apply outlier correction within groups"""
+    corrected_df = df.copy()
+    results = {}
+    
+    if groupby_cols:
+        # Group-based correction
+        for numeric_col in numeric_cols:
+            column_results = {}
+            total_outliers = 0
+            
+            for group_name, group_data in df.groupby(groupby_cols):
+                group_series = group_data[numeric_col]
+                
+                if len(group_series.dropna()) < 3:  # Skip groups with too few observations
+                    continue
+                
+                # Detect outliers within group
+                if detection_method == "IQR":
+                    outliers, _, _ = detect_outliers_iqr(group_series, kwargs.get('iqr_multiplier', 1.5))
+                else:  # Z-Score
+                    outliers = detect_outliers_zscore(group_series, kwargs.get('zscore_threshold', 3))
+                
+                # Apply correction
+                if correction_method == "Mean":
+                    corrected_series = correct_outliers_mean(group_series, outliers, group_series)
+                elif correction_method == "Median":
+                    corrected_series = correct_outliers_median(group_series, outliers, group_series)
+                elif correction_method == "Moving Average":
+                    corrected_series = correct_outliers_moving_average(group_series, outliers, kwargs.get('window', 5))
+                elif correction_method == "Winsorization":
+                    corrected_series = winsorize_data(group_series, kwargs.get('limits', (0.05, 0.05)))
+                
+                # Update the corrected dataframe
+                corrected_df.loc[group_data.index, numeric_col] = corrected_series
+                
+                # Store group results
+                column_results[str(group_name)] = {
+                    'outliers': outliers,
+                    'outlier_count': outliers.sum(),
+                    'group_size': len(group_series),
+                    'outlier_percentage': (outliers.sum() / len(group_series)) * 100 if len(group_series) > 0 else 0
+                }
+                total_outliers += outliers.sum()
+            
+            results[numeric_col] = {
+                'group_results': column_results,
+                'total_outliers': total_outliers,
+                'method': correction_method,
+                'detection_method': detection_method
+            }
+    else:
+        # No grouping - apply to entire dataset
+        for numeric_col in numeric_cols:
+            data = df[numeric_col]
+            
+            # Detect outliers
+            if detection_method == "IQR":
+                outliers, _, _ = detect_outliers_iqr(data, kwargs.get('iqr_multiplier', 1.5))
+            else:  # Z-Score
+                outliers = detect_outliers_zscore(data, kwargs.get('zscore_threshold', 3))
+            
+            # Apply correction
+            if correction_method == "Mean":
+                corrected_data = correct_outliers_mean(data, outliers)
+            elif correction_method == "Median":
+                corrected_data = correct_outliers_median(data, outliers)
+            elif correction_method == "Moving Average":
+                corrected_data = correct_outliers_moving_average(data, outliers, kwargs.get('window', 5))
+            elif correction_method == "Winsorization":
+                corrected_data = winsorize_data(data, kwargs.get('limits', (0.05, 0.05)))
+            
+            corrected_df[numeric_col] = corrected_data
+            
+            results[numeric_col] = {
+                'outliers': outliers,
+                'total_outliers': outliers.sum(),
+                'outlier_percentage': (outliers.sum() / len(data)) * 100,
+                'method': correction_method,
+                'detection_method': detection_method
+            }
+    
+    return corrected_df, results
+
+# File upload section
+if st.session_state.df is None:
+    st.markdown("""
+    <div class="upload-section">
+        <h3>📁 Upload Your Data File</h3>
+        <p>Upload a CSV or Excel file to detect and correct outliers with group-based analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    uploaded_file = st.file_uploader(
+        "Choose a file",
+        type=['csv', 'xlsx', 'xls'],
+        help="Upload CSV or Excel files"
+    )
+    
+    if uploaded_file is not None:
+        df = read_file(uploaded_file)
+        if df is not None:
+            # Check if there are numeric columns
+            numeric_cols = get_numeric_columns(df)
+            if len(numeric_cols) == 0:
+                st.error("❌ Dataset must have at least 1 numeric column to detect outliers.")
+            else:
+                # Store in session state
+                st.session_state.df = df
+                st.session_state.original_df = df.copy()
+                
+                # Reset state when new file is uploaded
+                st.session_state.corrected_df = None
+                st.session_state.outlier_results = {}
+                st.session_state.correction_applied = False
+                
+                st.success(f"✅ File uploaded successfully!")
+                
+                # Show file info
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.info(f"📊 **File:** {uploaded_file.name}")
+                with col2:
+                    st.info(f"📏 **Shape:** {df.shape[0]} rows × {df.shape[1]} columns")
+                with col3:
+                    st.info(f"🔢 **Numeric columns:** {len(numeric_cols)}")
+                
+                st.rerun()
+
+# Main content when file is uploaded
+if st.session_state.df is not None:
+    df = st.session_state.df
+    numeric_cols = get_numeric_columns(df)
+    categorical_cols = get_categorical_columns(df)
+    
+    # Reset button
+    if st.button("🔄 Upload New File", type="secondary"):
+        # Reset everything
+        st.session_state.df = None
+        st.session_state.original_df = None
+        st.session_state.corrected_df = None
+        st.session_state.outlier_results = {}
+        st.session_state.correction_applied = False
+        st.rerun()
+    
+    # Show current file stats
+    st.subheader("📊 Current Dataset Overview")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h3>{df.shape[0]:,}</h3>
+            <p>Rows</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h3>{len(numeric_cols)}</h3>
+            <p>Numeric Columns</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="stats-card">
+            <h3>{len(categorical_cols)}</h3>
+            <p>Grouping Options</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        missing_values = df.isnull().sum().sum()
+        st.markdown(f"""
+        <div class="stats-card">
+            <h3>{missing_values}</h3>
+            <p>Missing Values</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Outlier detection and correction section
+    if not st.session_state.correction_applied:
+        st.subheader("🎯 Configure Outlier Detection & Correction")
+        
+        # Two-column layout for selection
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            <div class="section-header">
+                📊 Step 1: Select Grouping Variables (Optional)
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div class="selection-card">
+            """, unsafe_allow_html=True)
+            
+            st.markdown("**Group by columns (optional):**")
+            st.markdown("Select categorical columns to group data before outlier detection")
+            
+            groupby_columns = st.multiselect(
+                "Choose grouping columns",
+                categorical_cols,
+                help="Select columns to group by. Outliers will be detected within each group."
+            )
+            
+            if groupby_columns:
+                st.success(f"✅ Will analyze outliers within groups of: {', '.join(groupby_columns)}")
+                
+                # Show group information
+                if len(groupby_columns) == 1:
+                    group_counts = df[groupby_columns[0]].value_counts()
+                    st.markdown("**Group sizes:**")
+                    st.dataframe(group_counts.head(10), use_container_width=True)
+                else:
+                    group_counts = df.groupby(groupby_columns).size()
+                    st.markdown(f"**Total groups:** {len(group_counts)}")
+                    st.markdown(f"**Average group size:** {group_counts.mean():.1f}")
+            else:
+                st.info("💡 No grouping selected. Outliers will be detected across the entire dataset.")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("""
+            <div class="section-header">
+                🔢 Step 2: Select Numeric Columns to Analyze
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div class="selection-card">
+            """, unsafe_allow_html=True)
+            
+            st.markdown("**Numeric columns for outlier detection:**")
+            st.markdown("Select which numeric columns to analyze and correct")
+            
+            selected_numeric_cols = st.multiselect(
+                "Choose numeric columns",
+                numeric_cols,
+                default=numeric_cols[:5] if len(numeric_cols) >= 5 else numeric_cols,
+                help="Select the numeric columns you want to analyze for outliers"
+            )
+            
+            if selected_numeric_cols:
+                st.success(f"✅ Will analyze {len(selected_numeric_cols)} columns")
+                
+                # Show basic stats for selected columns
+                selected_data = df[selected_numeric_cols]
+                st.markdown("**Basic statistics:**")
+                st.dataframe(selected_data.describe().round(2), use_container_width=True)
+            else:
+                st.warning("⚠️ Please select at least one numeric column")
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Method selection
+        if selected_numeric_cols:
+            st.markdown("""
+            <div class="section-header">
+                🛠️ Step 3: Choose Detection and Correction Methods
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Detection method
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### Outlier Detection Method")
+                detection_method = st.selectbox(
+                    "Choose detection method:",
+                    ["IQR", "Z-Score"],
+                    help="Method used to identify outliers"
+                )
+                
+                if detection_method == "IQR":
+                    iqr_multiplier = st.slider(
+                        "IQR multiplier",
+                        min_value=1.0,
+                        max_value=3.0,
+                        value=1.5,
+                        step=0.1,
+                        help="Higher values = fewer outliers detected"
+                    )
+                else:
+                    zscore_threshold = st.slider(
+                        "Z-Score threshold",
+                        min_value=2.0,
+                        max_value=4.0,
+                        value=3.0,
+                        step=0.1,
+                        help="Higher values = fewer outliers detected"
+                    )
+            
+            with col2:
+                st.markdown("### Correction Method")
+                correction_method = st.selectbox(
+                    "Choose correction method:",
+                    ["Mean", "Median", "Moving Average", "Winsorization"],
+                    help="Method to replace outliers"
+                )
+                
+                # Method-specific parameters
+                if correction_method == "Moving Average":
+                    window_size = st.number_input(
+                        "Window size",
+                        min_value=3,
+                        max_value=21,
+                        value=5,
+                        step=2,
+                        help="Number of neighboring values for averaging"
+                    )
+                
+                elif correction_method == "Winsorization":
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        lower_percentile = st.slider(
+                            "Lower limit (%)",
+                            min_value=0.0,
+                            max_value=10.0,
+                            value=5.0,
+                            step=0.5
+                        )
+                    with col_b:
+                        upper_percentile = st.slider(
+                            "Upper limit (%)",
+                            min_value=90.0,
+                            max_value=100.0,
+                            value=95.0,
+                            step=0.5
+                        )
+            
+            # Show method descriptions
+            st.markdown("### 📋 Method Descriptions")
+            
+            method_descriptions = {
+                "Mean": "Replace outliers with the mean value of the group/dataset",
+                "Median": "Replace outliers with the median value of the group/dataset", 
+                "Moving Average": "Replace outliers with the moving average of surrounding values",
+                "Winsorization": "Cap extreme values at specified percentiles"
+            }
+            
+            badges = {
+                "Mean": "mean",
+                "Median": "median", 
+                "Moving Average": "moving-avg",
+                "Winsorization": "winsorized"
+            }
+            
+            st.markdown(f"""
+            <div class="method-card">
+                <span class="method-badge {badges[correction_method]}">🎯 {correction_method}</span>
+                <p>{method_descriptions[correction_method]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Apply correction
+            if st.button("🎯 Detect and Correct Outliers", type="primary"):
+                with st.spinner("Detecting and correcting outliers..."):
+                    try:
+                        # Prepare parameters
+                        kwargs = {}
+                        if detection_method == "IQR":
+                            kwargs['iqr_multiplier'] = iqr_multiplier
+                        else:
+                            kwargs['zscore_threshold'] = zscore_threshold
+                        
+                        if correction_method == "Moving Average":
+                            kwargs['window'] = window_size
+                        elif correction_method == "Winsorization":
+                            kwargs['limits'] = (lower_percentile/100, (100-upper_percentile)/100)
+                        
+                        # Apply correction
+                        corrected_df, results = apply_group_based_correction(
+                            df, groupby_columns, selected_numeric_cols, 
+                            correction_method, detection_method, **kwargs
+                        )
+                        
+                        # Store results
+                        st.session_state.corrected_df = corrected_df
+                        st.session_state.outlier_results = results
+                        st.session_state.correction_applied = True
+                        
+                        st.success("✅ Outliers detected and corrected successfully!")
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error detecting/correcting outliers: {str(e)}")
+
+# Show results if correction has been applied
+if st.session_state.correction_applied and st.session_state.corrected_df is not None:
+    st.subheader("📊 Outlier Detection & Correction Results")
+    
+    # Summary statistics
+    total_outliers = sum(
+        result.get('total_outliers', 0) for result in st.session_state.outlier_results.values()
+    )
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Columns Analyzed", len(st.session_state.outlier_results))
+    with col2:
+        st.metric("Total Outliers Found", total_outliers)
+    with col3:
+        correction_method = list(st.session_state.outlier_results.values())[0]['method']
+        st.metric("Correction Method", correction_method)
+    
+    # Detailed results for each column
+    for column, results in st.session_state.outlier_results.items():
+        st.markdown(f"#### Results for {column}")
+        
+        if 'group_results' in results:
+            # Group-based results
+            st.markdown(f"""
+            <div class="group-summary">
+                <strong>Group-based Analysis</strong><br>
+                🎯 Method: {results['method']}<br>
+                📊 Detection: {results['detection_method']}<br>
+                🔢 Total outliers: {results['total_outliers']}<br>
+                📊 Groups analyzed: {len(results['group_results'])}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Group details
+            group_data = []
+            for group_name, group_result in results['group_results'].items():
+                group_data.append({
+                    'Group': group_name,
+                    'Group Size': group_result['group_size'],
+                    'Outliers Found': group_result['outlier_count'],
+                    'Outlier Rate (%)': f"{group_result['outlier_percentage']:.2f}"
+                })
+            
+            if group_data:
+                group_df = pd.DataFrame(group_data)
+                st.dataframe(group_df, use_container_width=True)
+        else:
+            # Overall results
+            st.markdown(f"""
+            <div class="correction-summary">
+                <strong>Overall Analysis</strong><br>
+                🎯 Method: {results['method']}<br>
+                📊 Detection: {results['detection_method']}<br>
+                🔢 Outliers found: {results['total_outliers']}<br>
+                📈 Outlier rate: {results['outlier_percentage']:.2f}%
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Before/After statistics
+        original_stats = st.session_state.original_df[column].describe()
+        corrected_stats = st.session_state.corrected_df[column].describe()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Original Statistics:**")
+            st.dataframe(original_stats.round(3), use_container_width=True)
+        with col2:
+            st.markdown("**Corrected Statistics:**")
+            st.dataframe(corrected_stats.round(3), use_container_width=True)
+        
+        st.markdown("---")
+    
+    # Display corrected dataframe
+    st.markdown("### 📈 Dataset with Corrected Values")
+    
+    # Show option to compare with original
+    show_comparison = st.checkbox("Show side-by-side comparison with original data")
+    
+    if show_comparison:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Original Data:**")
+            st.dataframe(st.session_state.original_df, use_container_width=True, height=400)
+        with col2:
+            st.markdown("**Corrected Data:**")
+            st.dataframe(st.session_state.corrected_df, use_container_width=True, height=400)
+    else:
+        st.dataframe(st.session_state.corrected_df, use_container_width=True, height=400)
+    
+    # Download section
+    st.markdown("### 💾 Download Corrected Dataset")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # CSV download
+        csv_buffer = io.StringIO()
+        st.session_state.corrected_df.to_csv(csv_buffer, index=False)
+        csv_data = csv_buffer.getvalue()
+        
+        st.download_button(
+            label="📥 Download as CSV",
+            data=csv_data,
+            file_name=f"outlier_corrected_data_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv",
+            help="Download dataset with corrected outliers as CSV"
+        )
+    
+    with col2:
+        # Excel download with correction log
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            # Original and corrected data
+            st.session_state.original_df.to_excel(writer, sheet_name='Original_Data', index=False)
+            st.session_state.corrected_df.to_excel(writer, sheet_name='Corrected_Data', index=False)
+            
+            # Correction log
+            log_data = []
+            for column, results in st.session_state.outlier_results.items():
+                if 'group_results' in results:
+                    # Group-based results
+                    for group_name, group_result in results['group_results'].items():
+                        log_data.append({
+                            'Column': column,
+                            'Group': group_name,
+                            'Correction_Method': results['method'],
+                            'Detection_Method': results['detection_method'],
+                            'Group_Size': group_result['group_size'],
+                            'Outliers_Found': group_result['outlier_count'],
+                            'Outlier_Percentage': f"{group_result['outlier_percentage']:.2f}%",
+                            'Correction_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        })
+                else:
+                    # Overall results
+                    log_data.append({
+                        'Column': column,
+                        'Group': 'All Data',
+                        'Correction_Method': results['method'],
+                        'Detection_Method': results['detection_method'],
+                        'Group_Size': len(st.session_state.original_df),
+                        'Outliers_Found': results['total_outliers'],
+                        'Outlier_Percentage': f"{results['outlier_percentage']:.2f}%",
+                        'Correction_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    })
+            
+            if log_data:
+                log_df = pd.DataFrame(log_data)
+                log_df.to_excel(writer, sheet_name='Correction_Log', index=False)
+        
+        excel_data = excel_buffer.getvalue()
+        
+        st.download_button(
+            label="📥 Download as Excel",
+            data=excel_data,
+            file_name=f"outlier_corrected_data_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Download dataset with correction log as Excel"
+        )
+    
+    # Button to try different correction
+    if st.button("🎯 Try Different Correction", type="secondary"):
+        st.session_state.correction_applied = False
+        st.session_state.corrected_df = None
+        st.session_state.outlier_results = {}
+        st.rerun()
+
+# Show features when no file is uploaded
+if st.session_state.df is None:
+    
+    # How it works section
+    st.subheader("ℹ️ How It Works")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **Advanced Outlier Detection Process:**
+        
+        1. **Upload Data**: CSV or Excel with numeric columns
+        
+        2. **Select Groups**: Choose categorical columns for grouping (optional)
+        
+        3. **Choose Columns**: Select numeric columns to analyze
+        
+        4. **Configure Methods**: Set detection and correction parameters
+        
+        5. **Apply Correction**: Generate cleaned dataset with group-based analysis
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Group-Based Analysis:**
+        
+        **🔍 Why Group?**
+        - Different groups may have different outlier patterns
+        - More accurate detection within similar contexts
+        - Preserves group-specific characteristics
+        
+        **📊 Example:**
+        - Group by "Department" 
+        - Detect salary outliers within each department
+        - Replace with department-specific mean/median
+        """)
+    
+    st.subheader("✨ Correction Methods")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **📊 Statistical Methods:**
+        
+        <span class="method-badge mean">📊 Mean</span> Replace outliers with group/overall mean<br><br>
+        
+        <span class="method-badge median">📊 Median</span> Replace outliers with group/overall median<br><br>
+        
+        **Best for:** Simple statistical replacement within groups
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        **🔧 Advanced Methods:**
+        
+        <span class="method-badge moving-avg">📈 Moving Average</span> Replace with local trend patterns<br><br>
+        
+        <span class="method-badge winsorized">🎯 Winsorization</span> Cap values at percentile boundaries<br><br>
+        
+        **Best for:** Preserving data patterns and distributions
+        """, unsafe_allow_html=True)
+    
+    st.subheader("🎯 Key Features")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **🏗️ Flexible Grouping:**
+        - Group by any categorical column(s)
+        - Automatic group size analysis
+        - Group-specific outlier detection
+        - Maintains group characteristics
+        """)
+    
+    with col2:
+        st.markdown("""
+        **📊 Comprehensive Analysis:**
+        - Before/after statistical comparison
+        - Group-by-group outlier summary
+        - Visual detection feedback
+        - Detailed correction logging
+        """)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #666; padding: 1rem;">
+    <p>🎯 Built with Streamlit | Advanced Outlier Detection & Correction Tool v2.0</p>
+</div>
+""", unsafe_allow_html=True)
