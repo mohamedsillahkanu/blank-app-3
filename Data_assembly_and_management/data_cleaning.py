@@ -9,8 +9,7 @@ import numpy as np
 st.set_page_config(
     page_title="File Combiner Tool",
     page_icon="🔗",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 # Custom CSS for better styling
@@ -477,42 +476,50 @@ if st.session_state.combined_df:
             help="Download combined data as Excel file with multiple sheets"
         )
 
-# Sidebar information
-with st.sidebar:
-    st.header("ℹ️ How It Works")
-    
-    st.markdown("""
-    **File Combination Logic:**
-    
-    1. **By File Type**: Files are grouped by type (CSV, Excel)
-    
-    2. **Common Columns**: Within each type, files are combined based on common columns
-    
-    3. **Source Tracking**: A 'source_file' column is added to track original files
-    
-    4. **No Common Columns**: If no common columns exist, all columns are preserved
-    """)
-    
+# Reset button in main area when files are uploaded
+if st.session_state.uploaded_files_data:
     st.markdown("---")
-    
-    st.markdown("""
-    **Supported Formats:**
-    - 📄 CSV files
-    - 📊 Excel files (.xlsx, .xls)
-    """)
-    
-    st.markdown("---")
-    
-    if st.session_state.uploaded_files_data:
-        if st.button("🔄 Upload New Files"):
-            # Clear all session state
-            st.session_state.uploaded_files_data = []
-            st.session_state.combined_df = None
-            st.session_state.combination_log = []
-            st.rerun()
+    if st.button("🔄 Upload New Files", type="secondary"):
+        # Clear all session state
+        st.session_state.uploaded_files_data = []
+        st.session_state.combined_df = None
+        st.session_state.combination_log = []
+        st.rerun()
 
-# Show features when no files are uploaded
+# Show features and how it works when no files are uploaded
 if not uploaded_files and not st.session_state.uploaded_files_data:
+    
+    # How it works section
+    st.subheader("ℹ️ How It Works")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **File Combination Logic:**
+        
+        1. **By File Type**: Files are grouped by type (CSV, Excel)
+        
+        2. **Common Columns**: Within each type, files are combined based on common columns
+        
+        3. **Source Tracking**: A 'source_file' column is added to track original files
+        
+        4. **No Common Columns**: If no common columns exist, all columns are preserved
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Supported Formats:**
+        - 📄 CSV files
+        - 📊 Excel files (.xlsx, .xls)
+        
+        **Process:**
+        1. Upload multiple files
+        2. Automatic analysis
+        3. Smart combination
+        4. Download results
+        """)
+    
     st.subheader("✨ Tool Features")
     
     col1, col2 = st.columns(2)
