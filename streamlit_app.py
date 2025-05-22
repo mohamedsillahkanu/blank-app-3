@@ -274,17 +274,15 @@ def main():
     
     # Define the modules with their descriptions and icons
     modules = {
-        "Data_assembly.py": {"icon": "📊", "desc": "Collect and gather all necessary data for the process"},
-        "Data_management.py": {"icon": "💾", "desc": "Organize and manage your datasets efficiently"},
-        "Epidemiological_stratification.py": {"icon": "🔬", "desc": "Analyze epidemiological data and identify patterns"},
-        "Strat_of_other_determinants.py": {"icon": "🧩", "desc": "Explore other health determinants and their impacts"},
-        "Review_of_past_interventions.py": {"icon": "📈", "desc": "Evaluate the effectiveness of previous health interventions"},
-        "Intervention_targeting.py": {"icon": "🎯", "desc": "Plan and optimize new health intervention strategies"},
+        "Data_assembly_and_management.py": {"icon": "", "desc": "Collect and gather all necessary data for the process"},
+        "Stratification.py": {"icon": "", "desc": "Analyze epidemiological data and identify patterns"},
+        "Review_of_past_interventions.py": {"icon": "", "desc": "Evaluate the effectiveness of previous health interventions"},
+        "Intervention_targeting.py": {"icon": "", "desc": "Plan and optimize new health intervention strategies"},
     }
     
     # Get the correct pages directory path
     base_dir = os.path.abspath(os.path.dirname(__file__))
-    pages_dir = os.path.join(base_dir, "pages")
+
     
     # Create 2 columns
     col1, col2 = st.columns(2)
@@ -304,7 +302,7 @@ def main():
         for i in range(1, len(module_list), 2):
             if i < len(module_list):
                 name, info = module_list[i]
-                create_module_card(name, info, pages_dir)
+                create_module_card(name, info, base_dir)
     
     # Create footer
     footer_html = """
