@@ -202,7 +202,11 @@ def create_module_card(name, info, pages_dir):
                  key=f"btn_{name}", 
                  disabled=not file_exists):
         st.session_state.current_module = name
-        st.rerun()  # Changed from st.experimental_rerun()
+        # Use experimental_rerun for compatibility with older Streamlit versions
+        try:
+            st.rerun()
+        except AttributeError:
+            st.experimental_rerun()
 
 # Main function to run the dashboard
 def main():
@@ -233,7 +237,11 @@ def main():
         
         if st.button("← Back", key="std_back_btn"):
             st.session_state.current_module = None
-            st.rerun()  # Changed from st.experimental_rerun()
+            # Use experimental_rerun for compatibility with older Streamlit versions
+            try:
+                st.rerun()
+            except AttributeError:
+                st.experimental_rerun()
         
         try:
             # Extract module name without .py extension
