@@ -1,18 +1,20 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-from datetime import datetime
+import importlib
 import os
+import sys
+import types
+import importlib.util
+from datetime import datetime
 
-# Set page configuration
+# Set page configuration for the main dashboard
 st.set_page_config(
-    page_title="Data Assembly & Management",
-    page_icon="📊",
+    page_title="SNT Dashboard",
+    page_icon="🧊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Define color theme - light blue palette (same as main dashboard)
+# Define color theme - light blue palette
 COLORS = {
     "primary": "#1E88E5",       # Primary blue
     "secondary": "#90CAF9",     # Light blue
@@ -21,7 +23,7 @@ COLORS = {
     "accent": "#64B5F6"         # Accent blue
 }
 
-# CSS for styling
+# CSS for styling the dashboard
 def get_css():
     return f"""
     <style>
@@ -36,8 +38,8 @@ def get_css():
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
         
-        /* Page title styling */
-        .page-title {{
+        /* Dashboard title styling */
+        .dashboard-title {{
             background-color: {COLORS["primary"]};
             padding: 20px;
             border-radius: 10px;
@@ -47,29 +49,37 @@ def get_css():
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }}
         
-        /* Section cards */
-        .section-card {{
+        /* Module cards */
+        .module-card {{
             background-color: white;
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 15px;
             border-left: 5px solid {COLORS["primary"]};
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }}
         
-        /* Button styling */
-        .stButton>button {{
+        .module-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }}
+        
+        /* Icons in module cards */
+        .module-icon {{
+            font-size: 24px;
+            margin-right: 10px;
+        }}
+        
+        /* Footer styling */
+        .footer {{
             background-color: {COLORS["primary"]};
+            padding: 15px;
+            border-radius: 10px;
             color: white;
-            border-radius: 5px;
-            border: none;
-            padding: 8px 16px;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }}
-        
-        .stButton>button:hover {{
-            background-color: {COLORS["text"]};
+            text-align: center;
+            margin-top: 30px;
+            box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
         }}
         
         /* Back button styling */
@@ -82,271 +92,212 @@ def get_css():
             cursor: pointer;
             font-weight: bold;
             margin-bottom: 20px;
-            text-decoration: none;
-            display: inline-block;
         }}
         
-        /* Footer */
-        .footer {{
+        /* Dividers */
+        hr {{
+            border-top: 2px solid {COLORS["secondary"]};
+            margin: 20px 0;
+        }}
+        
+        /* Button styling */
+        .stButton>button {{
             background-color: {COLORS["primary"]};
-            padding: 15px;
-            border-radius: 10px;
             color: white;
-            text-align: center;
-            margin-top: 30px;
-            box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+            border: none;
+            padding: 8px 16px;
+            width: 100%;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }}
+        
+        .stButton>button:hover {{
+            background-color: {COLORS["text"]};
         }}
     </style>
     """
 
-# Initialize session state
-if 'data_loaded' not in st.session_state:
-    st.session_state.data_loaded = False
-if 'processed_data' not in st.session_state:
-    st.session_state.processed_data = None
+# Generate a greeting based on time of day
+def get_greeting():
+    current_hour = datetime.now().hour
+    if current_hour < 12:
+        return "Good Morning"
+    elif current_hour < 18:
+        return "Good Afternoon"
+    else:
+        return "Good Evening"
 
-def load_sample_data():
-    """Generate sample health data for demonstration"""
-    np.random.seed(42)
-    n_samples = 1000
-    
-    data = {
-        'patient_id': range(1, n_samples + 1),
-        'age': np.random.randint(18, 80, n_samples),
-        'gender': np.random.choice(['Male', 'Female'], n_samples),
-        'region': np.random.choice(['North', 'South', 'East', 'West'], n_samples),
-        'intervention_type': np.random.choice(['Treatment A', 'Treatment B', 'Control'], n_samples),
-        'baseline_score': np.random.normal(50, 15, n_samples),
-        'follow_up_score': np.random.normal(55, 12, n_samples),
-        'comorbidities': np.random.randint(0, 5, n_samples),
-        'date_enrolled': pd.date_range('2023-01-01', periods=n_samples, freq='D')[:n_samples]
-    }
-    
-    df = pd.DataFrame(data)
-    df['improvement'] = df['follow_up_score'] - df['baseline_score']
-    df['success'] = (df['improvement'] > 5).astype(int)
-    
-    return df
+# Initialize session state for module navigation
+if 'current_module' not in st.session_state:
+    st.session_state.current_module = None
 
-def preprocess_data(df):
-    """Basic data preprocessing"""
-    # Handle missing values
-    df = df.dropna()
+# Function to safely import module without set_page_config issues
+def import_module_safely(module_path, module_name):
+    """Import a module from file path while handling set_page_config"""
+    try:
+        # Read the module content
+        with open(module_path, 'r') as file:
+            source_code = file.read()
+        
+        # Modify the source code to remove st.set_page_config call
+        modified_code = []
+        skip_line = False
+        inside_config = False
+        
+        for line in source_code.split('\n'):
+            if "st.set_page_config" in line:
+                skip_line = True
+                inside_config = True
+                continue
+            
+            if inside_config:
+                if ")" in line:
+                    inside_config = False
+                    skip_line = False
+                    continue
+            
+            if not skip_line:
+                modified_code.append(line)
+        
+        # Create a new module
+        module = types.ModuleType(module_name)
+        
+        # Set the module's __file__ attribute
+        module.__file__ = module_path
+        
+        # Add the module to sys.modules
+        sys.modules[module_name] = module
+        
+        # Execute the modified code in the module's namespace
+        exec('\n'.join(modified_code), module.__dict__)
+        
+        return module
     
-    # Create age groups
-    df['age_group'] = pd.cut(df['age'], bins=[0, 30, 50, 70, 100], 
-                            labels=['18-30', '31-50', '51-70', '71+'])
-    
-    # Create severity categories based on baseline score
-    df['severity'] = pd.cut(df['baseline_score'], 
-                           bins=[0, 35, 50, 65, 100],
-                           labels=['Mild', 'Moderate', 'Severe', 'Critical'])
-    
-    return df
+    except Exception as e:
+        st.error(f"Error loading module: {str(e)}")
+        return None
 
+# Function to create a card for each module
+def create_module_card(name, info, base_dir):
+    module_name = name.replace('.py', '').replace('_', ' ').title()
+    
+    card_html = f"""
+    <div class="module-card">
+        <h3><span class="module-icon">{info['icon']}</span>{module_name}</h3>
+        <p>{info['desc']}</p>
+    </div>
+    """
+    
+    st.markdown(card_html, unsafe_allow_html=True)
+    
+    # Check if the module file exists
+    module_file_path = os.path.join(base_dir, name)
+    file_exists = os.path.exists(module_file_path)
+    
+    if not file_exists:
+        st.warning(f"Module file not found: {module_file_path}")
+    
+    if st.button(f"Open {module_name}", 
+                 key=f"btn_{name}", 
+                 disabled=not file_exists):
+        st.session_state.current_module = name
+        st.rerun()  # FIXED: Use st.rerun() instead of st.experimental_rerun()
+
+# Main function to run the dashboard
 def main():
     # Apply custom CSS
     st.markdown(get_css(), unsafe_allow_html=True)
     
-    # Back button at the top
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col1:
-        if st.button("← Back to Dashboard", key="back_btn"):
-            st.markdown("""
-            <script>
-                window.history.back();
-            </script>
-            """, unsafe_allow_html=True)
-            st.info("Click the back button in your browser or navigate back to the main dashboard")
-    
-    # Page title
-    title_html = f"""
-    <div class="page-title">
-        <h1>📊 Data Assembly & Management</h1>
-        <p>Load, process, and manage datasets for epidemiological analysis</p>
+    # Create header
+    header_html = f"""
+    <div class="dashboard-title">
+        <h1>🧊 SNT Dashboard</h1>
+        <p>{get_greeting()} | {datetime.now().strftime("%A, %B %d, %Y")}</p>
     </div>
     """
-    st.markdown(title_html, unsafe_allow_html=True)
+    st.markdown(header_html, unsafe_allow_html=True)
     
-    # Sidebar for data operations
-    st.sidebar.title("Data Operations")
+    # If a module is selected, run it
+    if st.session_state.current_module:
+        # Add a back button
+        if st.button("← Back to Dashboard", key="std_back_btn"):
+            st.session_state.current_module = None
+            st.rerun()  # FIXED: Use st.rerun() instead of st.experimental_rerun()
+        
+        try:
+            # Extract module name without .py extension
+            module_name = st.session_state.current_module.replace('.py', '')
+            
+            # Get the module path from main directory
+            base_dir = os.path.abspath(os.path.dirname(__file__))
+            module_path = os.path.join(base_dir, st.session_state.current_module)
+            
+            # Display module title
+            st.markdown(f"<h2>{module_name.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
+            
+            # Import the module safely (without set_page_config issues)
+            module = import_module_safely(module_path, module_name)
+            
+            if module:
+                # Try to run the module
+                # First, try to call the run() function if it exists
+                if hasattr(module, 'run'):
+                    module.run()
+                # If not, try to find a main() function
+                elif hasattr(module, 'main'):
+                    module.main()
+                # If none of those work, we'll assume the module has already executed its code
+                else:
+                    st.warning(f"Module {module_name} doesn't have a run() or main() function, but its code has been executed.")
+            else:
+                st.error(f"Failed to load module: {st.session_state.current_module}")
+            
+            return
+        except Exception as e:
+            st.error(f"Error running module: {str(e)}")
+            st.write(f"Details: {type(e).__name__}: {str(e)}")
     
-    # Data loading section
-    st.sidebar.subheader("1. Load Data")
-    data_source = st.sidebar.selectbox(
-        "Select Data Source:",
-        ["Sample Data", "Upload CSV", "Database Connection"]
-    )
+    # Otherwise, show the main dashboard with the modules in 2 columns and 3 rows
+    st.markdown("<h2>Select a Section</h2>", unsafe_allow_html=True)
     
-    if data_source == "Sample Data":
-        if st.sidebar.button("Load Sample Data"):
-            with st.spinner("Loading sample data..."):
-                st.session_state.processed_data = load_sample_data()
-                st.session_state.data_loaded = True
-            st.sidebar.success("Sample data loaded!")
+    # Define the modules with their descriptions and icons
+    modules = {
+        "Data_assembly_and_management.py": {"icon": "📊", "desc": "Assembly datasets and manage data preprocessing workflows"},
+        "Epidemiological_stratification.py": {"icon": "🔬", "desc": "Analyze epidemiological data and identify patterns"},
+        "Review_of_past_interventions.py": {"icon": "📋", "desc": "Evaluate the effectiveness of previous health interventions"},
+        "Intervention_targeting.py": {"icon": "🎯", "desc": "Plan and optimize new health intervention strategies"}
+    }
     
-    elif data_source == "Upload CSV":
-        uploaded_file = st.sidebar.file_uploader("Choose a CSV file", type="csv")
-        if uploaded_file is not None:
-            try:
-                st.session_state.processed_data = pd.read_csv(uploaded_file)
-                st.session_state.data_loaded = True
-                st.sidebar.success("File uploaded successfully!")
-            except Exception as e:
-                st.sidebar.error(f"Error loading file: {str(e)}")
+    # Get the main directory path (same directory as this file)
+    base_dir = os.path.abspath(os.path.dirname(__file__))
     
-    elif data_source == "Database Connection":
-        st.sidebar.info("Database connection feature coming soon...")
+    # Create 2 columns
+    col1, col2 = st.columns(2)
     
-    # Data preprocessing section
-    if st.session_state.data_loaded:
-        st.sidebar.subheader("2. Data Processing")
-        if st.sidebar.button("Preprocess Data"):
-            with st.spinner("Processing data..."):
-                st.session_state.processed_data = preprocess_data(st.session_state.processed_data)
-            st.sidebar.success("Data preprocessed!")
+    # Arrange modules in 2 columns
+    module_list = list(modules.items())
     
-    # Main content area
-    if st.session_state.data_loaded and st.session_state.processed_data is not None:
-        # Data overview section
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.subheader("📋 Dataset Overview")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total Records", len(st.session_state.processed_data))
-        with col2:
-            st.metric("Total Columns", len(st.session_state.processed_data.columns))
-        with col3:
-            missing_values = st.session_state.processed_data.isnull().sum().sum()
-            st.metric("Missing Values", missing_values)
-        with col4:
-            memory_usage = st.session_state.processed_data.memory_usage(deep=True).sum() / 1024**2
-            st.metric("Memory Usage (MB)", f"{memory_usage:.2f}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Data preview section
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.subheader("👁️ Data Preview")
-        
-        # Show first few rows
-        st.write("**First 10 rows:**")
-        st.dataframe(st.session_state.processed_data.head(10))
-        
-        # Show data types
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Data Types:**")
-            dtype_df = pd.DataFrame({
-                'Column': st.session_state.processed_data.columns,
-                'Type': st.session_state.processed_data.dtypes.astype(str)
-            })
-            st.dataframe(dtype_df)
-        
-        with col2:
-            st.write("**Summary Statistics:**")
-            numeric_cols = st.session_state.processed_data.select_dtypes(include=[np.number]).columns
-            if len(numeric_cols) > 0:
-                st.dataframe(st.session_state.processed_data[numeric_cols].describe())
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Data quality section
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.subheader("🔍 Data Quality Assessment")
-        
-        # Missing values analysis
-        missing_data = st.session_state.processed_data.isnull().sum()
-        missing_data = missing_data[missing_data > 0].sort_values(ascending=False)
-        
-        if len(missing_data) > 0:
-            st.write("**Missing Values by Column:**")
-            missing_df = pd.DataFrame({
-                'Column': missing_data.index,
-                'Missing Count': missing_data.values,
-                'Missing %': (missing_data.values / len(st.session_state.processed_data) * 100).round(2)
-            })
-            st.dataframe(missing_df)
-        else:
-            st.success("✅ No missing values detected!")
-        
-        # Duplicate records check
-        duplicates = st.session_state.processed_data.duplicated().sum()
-        if duplicates > 0:
-            st.warning(f"⚠️ Found {duplicates} duplicate records")
-        else:
-            st.success("✅ No duplicate records found!")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Data filtering and export section
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.subheader("🔧 Data Operations")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("**Filter Data:**")
-            # Simple filtering interface
-            if 'age' in st.session_state.processed_data.columns:
-                age_range = st.slider(
-                    "Age Range:",
-                    int(st.session_state.processed_data['age'].min()),
-                    int(st.session_state.processed_data['age'].max()),
-                    (int(st.session_state.processed_data['age'].min()), 
-                     int(st.session_state.processed_data['age'].max()))
-                )
-                filtered_data = st.session_state.processed_data[
-                    (st.session_state.processed_data['age'] >= age_range[0]) & 
-                    (st.session_state.processed_data['age'] <= age_range[1])
-                ]
-                st.write(f"Filtered records: {len(filtered_data)}")
-        
-        with col2:
-            st.write("**Export Data:**")
-            if st.button("Download as CSV"):
-                csv = st.session_state.processed_data.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download CSV",
-                    data=csv,
-                    file_name=f"processed_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
-                )
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+    # First column - modules 0, 2
+    with col1:
+        for i in range(0, len(module_list), 2):
+            if i < len(module_list):
+                name, info = module_list[i]
+                create_module_card(name, info, base_dir)
     
-    else:
-        # Welcome screen when no data is loaded
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.subheader("👋 Welcome to Data Assembly & Management")
-        st.write("""
-        This module helps you:
-        
-        **📤 Load Data:**
-        - Import sample health datasets
-        - Upload your own CSV files
-        - Connect to databases (coming soon)
-        
-        **🔧 Process Data:**
-        - Clean and preprocess datasets
-        - Handle missing values
-        - Create derived variables
-        
-        **📊 Analyze Data:**
-        - View data quality metrics
-        - Generate summary statistics
-        - Filter and export data
-        
-        **Get started by selecting a data source from the sidebar!**
-        """)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Second column - modules 1, 3
+    with col2:
+        for i in range(1, len(module_list), 2):
+            if i < len(module_list):
+                name, info = module_list[i]
+                create_module_card(name, info, base_dir)
     
-    # Footer
-    footer_html = f"""
+    # Create footer
+    footer_html = """
     <div class="footer">
-        <p>📊 Data Assembly & Management Module | SNT Health Analytics</p>
-        <p>Last updated: {datetime.now().strftime("%B %d, %Y at %I:%M %p")}</p>
+        <p>© 2025 SNT Health Analytics Dashboard | Version 1.0</p>
+        <p>Last updated: May 21, 2025</p>
+        <p>Developer: MS Kanu</p>
     </div>
     """
     st.markdown(footer_html, unsafe_allow_html=True)
