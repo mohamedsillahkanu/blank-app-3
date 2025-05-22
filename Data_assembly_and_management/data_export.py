@@ -24,12 +24,26 @@ st.markdown("""
     }
     
     .column-rename-card {
-        background-color: #f8f9fa;
+        background-color: white;
+        color: black;
         padding: 1rem;
         border-radius: 10px;
         margin: 0.5rem 0;
-        border-left: 4px solid #9C27B0;
+        border: 1px solid #ddd;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        height: 60px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .stTextInput > div > div > input {
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid #ddd !important;
+        height: 60px !important;
+        padding: 1rem !important;
+        border-radius: 10px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
     
     .column-type-badge {
