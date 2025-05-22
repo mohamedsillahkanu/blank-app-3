@@ -145,22 +145,36 @@ def fix_file_indentation(file_path):
         # Split into lines
         lines = content.split('\n')
         
-        # Fix each line
+        # Advanced indentation fixing
         fixed_lines = []
-        for line in lines:
+        for i, line in enumerate(lines):
             # Convert tabs to 4 spaces
             fixed_line = line.expandtabs(4)
             
             # Remove trailing whitespace
             fixed_line = fixed_line.rstrip()
             
+            # Fix common indentation issues
+            if fixed_line.strip():  # Only process non-empty lines
+                # Count leading spaces
+                leading_spaces = len(fixed_line) - len(fixed_line.lstrip())
+                
+                # If the leading spaces are not a multiple of 4, round to nearest multiple
+                if leading_spaces % 4 != 0:
+                    # Round to nearest multiple of 4
+                    corrected_spaces = round(leading_spaces / 4) * 4
+                    fixed_line = ' ' * corrected_spaces + fixed_line.lstrip()
+            
             fixed_lines.append(fixed_line)
         
         # Join back together
         fixed_content = '\n'.join(fixed_lines)
         
-        # Create backup of original file
-        backup_path = file_path + '.backup'
+        # Create backup of original file with timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = f"{file_path}.backup_{timestamp}"
+        
         with open(backup_path, 'w', encoding='utf-8') as f:
             f.write(content)
         
@@ -254,32 +268,39 @@ def import_and_run_module(module_path, module_name):
         try:
             compiled_code = compile(modified_code, module_path, 'exec')
         except SyntaxError as se:
-            st.error(f"Syntax Error in {module_name}:")
-            st.error(f"Line {se.lineno}: {se.text}")
-            st.error(f"Error: {se.msg}")
+            st.error(f"❌ Syntax Error in {module_name}:")
+            st.error(f"📍 Line {se.lineno}: {se.text}")
+            st.error(f"🔍 Error: {se.msg}")
             
             # Show the problematic area
-            with st.expander("Show code around error"):
+            with st.expander("🔍 Show code around error"):
                 lines = modified_code.split('\n')
                 start = max(0, se.lineno - 5)
                 end = min(len(lines), se.lineno + 5)
                 for i in range(start, end):
                     line_num = i + 1
                     marker = ">>> " if line_num == se.lineno else "    "
-                    st.text(f"{marker}{line_num:3d}: {lines[i]}")
+                    st.code(f"{marker}{line_num:3d}: {lines[i]}")
             
-            # Offer to fix the file automatically
+            # Always offer to fix the file automatically for syntax errors
             st.warning("🔧 **Auto-Fix Available**")
-            if st.button(f"🛠️ Fix Indentation Issues in {module_name}.py", key=f"fix_{module_name}"):
-                success, message = fix_file_indentation(module_path)
-                if success:
-                    st.success(message)
-                    st.info("✅ File has been fixed! Click the button again to try loading the module.")
-                    # Clear the current module so user can try again
-                    if st.button("🔄 Try Loading Module Again", key=f"retry_{module_name}"):
-                        st.rerun()
-                else:
-                    st.error(message)
+            st.info("This will fix common indentation issues like tabs/spaces mixing and incorrect indentation levels.")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button(f"🛠️ Fix Indentation in {module_name}.py", key=f"fix_{module_name}"):
+                    with st.spinner("Fixing indentation..."):
+                        success, message = fix_file_indentation(module_path)
+                        if success:
+                            st.success(message)
+                            st.balloons()
+                        else:
+                            st.error(message)
+            
+            with col2:
+                if st.button("🔄 Try Again", key=f"retry_{module_name}"):
+                    st.rerun()
             
             return False
         
@@ -306,18 +327,23 @@ def import_and_run_module(module_path, module_name):
         # If it's an indentation error, show some helpful info and offer auto-fix
         if "indent" in str(e).lower():
             st.warning("🔧 **Indentation Error Detected**")
-            st.info("💡 This error usually happens because of mixed tabs and spaces.")
+            st.info("💡 This error happens because of mixed tabs and spaces or incorrect indentation levels.")
             
-            if st.button(f"🛠️ Auto-Fix Indentation in {module_name}.py", key=f"autofix_{module_name}"):
-                success, message = fix_file_indentation(module_path)
-                if success:
-                    st.success(message)
-                    st.info("✅ File has been fixed! Try loading the module again.")
-                    # Add a retry button
-                    if st.button("🔄 Retry Loading Module", key=f"retry2_{module_name}"):
-                        st.rerun()
-                else:
-                    st.error(message)
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button(f"🛠️ Auto-Fix Indentation", key=f"autofix_{module_name}"):
+                    with st.spinner("Fixing indentation..."):
+                        success, message = fix_file_indentation(module_path)
+                        if success:
+                            st.success(message)
+                            st.balloons()
+                        else:
+                            st.error(message)
+            
+            with col2:
+                if st.button("🔄 Retry", key=f"retry2_{module_name}"):
+                    st.rerun()
         
         return False
 
