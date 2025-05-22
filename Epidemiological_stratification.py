@@ -230,6 +230,17 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    st.markdown(
+        """
+        <div class="footer">
+            <p>2025 SNT Health Analytics Dashboard - Version 1.0</p>
+            <p>Last updated: May 21, 2025</p>
+            <p>Developer: MS Kanu</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 # Run app
 if __name__ == "__main__":
     main()
