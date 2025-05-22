@@ -221,15 +221,7 @@ def detect_outliers_iqr(data, multiplier=1.5):
     outliers = (data < lower_bound) | (data > upper_bound)
     return outliers, lower_bound, upper_bound
 
-def detect_outliers_zscore(data, threshold=3):
-    """Detect outliers using Z-score method"""
-    if len(data.dropna()) == 0:
-        return pd.Series(False, index=data.index)
-    
-    z_scores = np.abs(stats.zscore(data.dropna()))
-    outliers = pd.Series(False, index=data.index)
-    outliers.loc[data.dropna().index] = z_scores > threshold
-    return outliers
+
 
 def correct_outliers_mean(data, outliers, group_data=None):
     """Replace outliers with mean"""
@@ -272,7 +264,7 @@ def winsorize_data(data, limits=(0.05, 0.05)):
     
     return corrected
 
-def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_method, detection_method, **kwargs):
+def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_method, **kwargs):
     """Apply outlier correction within groups"""
     corrected_df = df.copy()
     results = {}
@@ -289,11 +281,8 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
                 if len(group_series.dropna()) < 3:  # Skip groups with too few observations
                     continue
                 
-                # Detect outliers within group
-                if detection_method == "IQR":
-                    outliers, _, _ = detect_outliers_iqr(group_series, kwargs.get('iqr_multiplier', 1.5))
-                else:  # Z-Score
-                    outliers = detect_outliers_zscore(group_series, kwargs.get('zscore_threshold', 3))
+                # Detect outliers within group using IQR method
+                outliers, _, _ = detect_outliers_iqr(group_series, kwargs.get('iqr_multiplier', 1.5))
                 
                 # Apply correction
                 if correction_method == "Mean":
@@ -321,18 +310,15 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
                 'group_results': column_results,
                 'total_outliers': total_outliers,
                 'method': correction_method,
-                'detection_method': detection_method
+                'detection_method': 'IQR'
             }
     else:
         # No grouping - apply to entire dataset
         for numeric_col in numeric_cols:
             data = df[numeric_col]
             
-            # Detect outliers
-            if detection_method == "IQR":
-                outliers, _, _ = detect_outliers_iqr(data, kwargs.get('iqr_multiplier', 1.5))
-            else:  # Z-Score
-                outliers = detect_outliers_zscore(data, kwargs.get('zscore_threshold', 3))
+            # Detect outliers using IQR method
+            outliers, _, _ = detect_outliers_iqr(data, kwargs.get('iqr_multiplier', 1.5))
             
             # Apply correction
             if correction_method == "Mean":
@@ -351,7 +337,7 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
                 'total_outliers': outliers.sum(),
                 'outlier_percentage': (outliers.sum() / len(data)) * 100,
                 'method': correction_method,
-                'detection_method': detection_method
+                'detection_method': 'IQR'
             }
     
     return corrected_df, results
@@ -544,30 +530,19 @@ if st.session_state.df is not None:
             
             with col1:
                 st.markdown("### Outlier Detection Method")
-                detection_method = st.selectbox(
-                    "Choose detection method:",
-                    ["IQR", "Z-Score"],
-                    help="Method used to identify outliers"
+                st.markdown("**IQR (Interquartile Range)**")
+                st.info("Uses Q1 and Q3 quartiles to identify outliers")
+                
+                iqr_multiplier = st.slider(
+                    "IQR multiplier",
+                    min_value=1.0,
+                    max_value=3.0,
+                    value=1.5,
+                    step=0.1,
+                    help="Higher values = fewer outliers detected"
                 )
                 
-                if detection_method == "IQR":
-                    iqr_multiplier = st.slider(
-                        "IQR multiplier",
-                        min_value=1.0,
-                        max_value=3.0,
-                        value=1.5,
-                        step=0.1,
-                        help="Higher values = fewer outliers detected"
-                    )
-                else:
-                    zscore_threshold = st.slider(
-                        "Z-Score threshold",
-                        min_value=2.0,
-                        max_value=4.0,
-                        value=3.0,
-                        step=0.1,
-                        help="Higher values = fewer outliers detected"
-                    )
+                st.markdown(f"**Detection rule:** Values outside Q1 - {iqr_multiplier}×IQR to Q3 + {iqr_multiplier}×IQR")
             
             with col2:
                 st.markdown("### Correction Method")
@@ -593,18 +568,20 @@ if st.session_state.df is not None:
                     with col_a:
                         lower_percentile = st.slider(
                             "Lower limit (%)",
-                            min_value=0.0,
-                            max_value=10.0,
+                            min_value=1.0,
+                            max_value=25.0,
                             value=5.0,
-                            step=0.5
+                            step=0.5,
+                            help="Values below this percentile will be capped"
                         )
                     with col_b:
                         upper_percentile = st.slider(
                             "Upper limit (%)",
-                            min_value=90.0,
-                            max_value=100.0,
+                            min_value=75.0,
+                            max_value=99.0,
                             value=95.0,
-                            step=0.5
+                            step=0.5,
+                            help="Values above this percentile will be capped"
                         )
             
             # Show method descriptions
@@ -636,11 +613,7 @@ if st.session_state.df is not None:
                 with st.spinner("Detecting and correcting outliers..."):
                     try:
                         # Prepare parameters
-                        kwargs = {}
-                        if detection_method == "IQR":
-                            kwargs['iqr_multiplier'] = iqr_multiplier
-                        else:
-                            kwargs['zscore_threshold'] = zscore_threshold
+                        kwargs = {'iqr_multiplier': iqr_multiplier}
                         
                         if correction_method == "Moving Average":
                             kwargs['window'] = window_size
@@ -650,7 +623,7 @@ if st.session_state.df is not None:
                         # Apply correction
                         corrected_df, results = apply_group_based_correction(
                             df, groupby_columns, selected_numeric_cols, 
-                            correction_method, detection_method, **kwargs
+                            correction_method, **kwargs
                         )
                         
                         # Store results
@@ -692,7 +665,7 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
             <div class="group-summary">
                 <strong>Group-based Analysis</strong><br>
                 🎯 Method: {results['method']}<br>
-                📊 Detection: {results['detection_method']}<br>
+                📊 Detection: IQR Method<br>
                 🔢 Total outliers: {results['total_outliers']}<br>
                 📊 Groups analyzed: {len(results['group_results'])}
             </div>
@@ -717,7 +690,7 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
             <div class="correction-summary">
                 <strong>Overall Analysis</strong><br>
                 🎯 Method: {results['method']}<br>
-                📊 Detection: {results['detection_method']}<br>
+                📊 Detection: IQR Method<br>
                 🔢 Outliers found: {results['total_outliers']}<br>
                 📈 Outlier rate: {results['outlier_percentage']:.2f}%
             </div>
@@ -791,7 +764,7 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
                             'Column': column,
                             'Group': group_name,
                             'Correction_Method': results['method'],
-                            'Detection_Method': results['detection_method'],
+                            'Detection_Method': 'IQR',
                             'Group_Size': group_result['group_size'],
                             'Outliers_Found': group_result['outlier_count'],
                             'Outlier_Percentage': f"{group_result['outlier_percentage']:.2f}%",
@@ -803,7 +776,7 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
                         'Column': column,
                         'Group': 'All Data',
                         'Correction_Method': results['method'],
-                        'Detection_Method': results['detection_method'],
+                        'Detection_Method': 'IQR',
                         'Group_Size': len(st.session_state.original_df),
                         'Outliers_Found': results['total_outliers'],
                         'Outlier_Percentage': f"{results['outlier_percentage']:.2f}%",
