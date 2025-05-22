@@ -274,10 +274,10 @@ def main():
     
     # Define the modules with their descriptions and icons
     modules = {
-        "Data_assembly_and_management.py": {"icon": "", "desc": "Assemble datasets and manage data preprocessing workflows"},
+        "Data_assembly_and_management.py": {"icon": "", "desc": "Assembly datasets and manage data preprocessing workflows"},
         "Epidemiological_stratification.py": {"icon": "", "desc": "Analyze epidemiological data and identify patterns"},
         "Review_of_past_interventions.py": {"icon": "", "desc": "Evaluate the effectiveness of previous health interventions"},
-        "Intervention_targeting.py": {"icon": "", "desc": "Plan and optimize new health intervention strategies"},
+        "Intervention_targeting.py": {"icon": "", "desc": "Plan and optimize new health intervention strategies"}
     }
     
     # Get the correct pages directory path
