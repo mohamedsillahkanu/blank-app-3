@@ -8,7 +8,7 @@ from datetime import datetime
 
 # Set page configuration for the main dashboard
 st.set_page_config(
-    page_title="SNT Dashboard",
+    page_title="DATA ASSEMBLY AND MANAGEMENT",
     page_icon="🧊",
     layout="wide",
     initial_sidebar_state="expanded"
