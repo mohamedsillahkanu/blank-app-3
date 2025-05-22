@@ -192,7 +192,7 @@ def create_module_card(name, info, pages_dir):
     st.markdown(card_html, unsafe_allow_html=True)
     
     # Check if the module file exists
-    module_file_path = os.path.join(pages_dir, name)
+    module_file_path = os.path.join(base_dir, name)
     file_exists = os.path.exists(module_file_path)
     
     if not file_exists:
@@ -212,7 +212,7 @@ def main():
     # Create header
     header_html = f"""
     <div class="dashboard-title">
-        <h1>🧊 SNT Dashboard</h1>
+        <h1>🧊 Data Management and Assembly</h1>
         <p>{get_greeting()} | {datetime.now().strftime("%A, %B %d, %Y")}</p>
     </div>
     """
@@ -242,7 +242,7 @@ def main():
             # Get the module path
             base_dir = os.path.abspath(os.path.dirname(__file__))
             pages_dir = os.path.join(base_dir, "pages")
-            module_path = os.path.join(pages_dir, st.session_state.current_module)
+            module_path = os.path.join(base_dir, st.session_state.current_module)
             
             # Display module title
             st.markdown(f"<h2>{module_name.replace('_', ' ').title()}</h2>", unsafe_allow_html=True)
