@@ -134,7 +134,7 @@ if 'current_module' not in st.session_state:
 
 # Function to safely import module without set_page_config issues
 def import_module_safely(module_path, module_name):
-    """Import a module from file path while handling set_page_config"""
+"""Import a module from file path while handling set_page_config"""
     try:
         # Read the module content
         with open(module_path, 'r') as file:
@@ -263,10 +263,10 @@ def main():
     
     # Define the modules with their descriptions and icons
     modules = {
-        "Data_assembly_and_management.py": {"icon": "📊", "desc": "Assembly datasets and manage data preprocessing workflows"},
-        "Epidemiological_stratification.py": {"icon": "🔬", "desc": "Analyze epidemiological data and identify patterns"},
-        "Review_of_past_interventions.py": {"icon": "📋", "desc": "Evaluate the effectiveness of previous health interventions"},
-        "Intervention_targeting.py": {"icon": "🎯", "desc": "Plan and optimize new health intervention strategies"}
+        "Data_assembly_and_management.py": {"icon": "", "desc": "Assembly datasets and manage data preprocessing workflows"},
+        "Epidemiological_stratification.py": {"icon": "", "desc": "Analyze epidemiological data and identify patterns"},
+        "Review_of_past_interventions.py": {"icon": "", "desc": "Evaluate the effectiveness of previous health interventions"},
+        "Intervention_targeting.py": {"icon": "", "desc": "Plan and optimize new health intervention strategies"}
     }
     
     # Get the main directory path (same directory as this file)
