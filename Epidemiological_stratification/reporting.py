@@ -118,14 +118,14 @@ def method_who(df):
     results = []
     
     # Get unique health facilities
-    hf_list = df['hf_id'].unique()
+    hf_list = df['hf_uid'].unique()
     
     # Get all unique months in the dataset
     df['year_month'] = df['date'].dt.to_period('M')
     all_months = sorted(df['year_month'].unique())
     
     for hf in hf_list:
-        hf_data = df[df['hf_id'] == hf].copy()
+        hf_data = df[df['hf_uid'] == hf].copy()
         hf_data = hf_data.sort_values('date')
         
         # Find first active date (when total > 0)
@@ -147,7 +147,7 @@ def method_who(df):
                         reported = False
                     
                     results.append({
-                        'hf_id': hf,
+                        'hf_uid': hf,
                         'year_month': month,
                         'method': 'WHO',
                         'included_in_denominator': True,
@@ -165,14 +165,14 @@ def method_ousmane(df):
     results = []
     
     # Get unique health facilities
-    hf_list = df['hf_id'].unique()
+    hf_list = df['hf_uid'].unique()
     
     # Get all unique months in the dataset
     df['year_month'] = df['date'].dt.to_period('M')
     all_months = sorted(df['year_month'].unique())
     
     for hf in hf_list:
-        hf_data = df[df['hf_id'] == hf].copy()
+        hf_data = df[df['hf_uid'] == hf].copy()
         hf_data = hf_data.sort_values('date')
         
         # Create a complete month series for this HF
@@ -200,7 +200,7 @@ def method_ousmane(df):
                 reported = hf_months.get(month, False)
                 
                 results.append({
-                    'hf_id': hf,
+                    'hf_uid': hf,
                     'year_month': month,
                     'method': 'Ousmane',
                     'included_in_denominator': included,
@@ -211,7 +211,7 @@ def method_ousmane(df):
                 # For first 5 months, include all HFs
                 reported = hf_months.get(month, False)
                 results.append({
-                    'hf_id': hf,
+                    'hf_uid': hf,
                     'year_month': month,
                     'method': 'Ousmane',
                     'included_in_denominator': True,
@@ -229,7 +229,7 @@ def method_mohamed(df):
     results = []
     
     # Get unique health facilities
-    hf_list = df['hf_id'].unique()
+    hf_list = df['hf_uid'].unique()
     
     # Get all unique months in the dataset
     df['year_month'] = df['date'].dt.to_period('M')
@@ -237,7 +237,7 @@ def method_mohamed(df):
     max_date = df['date'].max()
     
     for hf in hf_list:
-        hf_data = df[df['hf_id'] == hf].copy()
+        hf_data = df[df['hf_uid'] == hf].copy()
         hf_data = hf_data.sort_values('date')
         
         # Find first reporting date
@@ -402,7 +402,7 @@ with st.sidebar:
                     allout = susp = test = conf = treat = 0
                 
                 sample_data.append({
-                    'hf_id': hf,
+                    'hf_uid': hf,
                     'date': date,
                     'allout': allout,
                     'susp': susp,
