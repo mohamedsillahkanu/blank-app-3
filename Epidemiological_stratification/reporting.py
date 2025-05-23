@@ -83,25 +83,72 @@ if 'results' not in st.session_state:
 
 def validate_data(df):
     """Validate that the dataframe has required columns"""
-    required_cols = ['hf_id', 'date', 'allout', 'susp', 'test', 'conf', 'treat']
+    required_cols = ['hf_uid', 'year_mon', 'allout', 'susp', 'test', 'conf', 'maltreat']
     missing_cols = [col for col in required_cols if col not in df.columns]
     
     if missing_cols:
         st.error(f"Missing required columns: {', '.join(missing_cols)}")
         return False
     
-    # Convert date column to datetime
+    # Create date column from year_mon
     try:
-        df['date'] = pd.to_datetime(df['date'])
-    except:
-        st.error("Could not convert 'date' column to datetime format")
+        st.info("🔄 Creating date column from year_mon...")
+        
+        # Handle different year_mon formats
+        if df['year_mon'].dtype == 'object':
+            # Try different date formats
+            try:
+                # Try YYYY-MM format first
+                df['date'] = pd.to_datetime(df['year_mon'], format='%Y-%m')
+                st.success("✅ Successfully parsed year_mon as YYYY-MM format")
+            except:
+                try:
+                    # Try YYYYMM format
+                    df['date'] = pd.to_datetime(df['year_mon'], format='%Y%m')
+                    st.success("✅ Successfully parsed year_mon as YYYYMM format")
+                except:
+                    try:
+                        # Try MM/YYYY format
+                        df['date'] = pd.to_datetime(df['year_mon'], format='%m/%Y')
+                        st.success("✅ Successfully parsed year_mon as MM/YYYY format")
+                    except:
+                        try:
+                            # Try general datetime parsing
+                            df['date'] = pd.to_datetime(df['year_mon'])
+                            st.success("✅ Successfully parsed year_mon using automatic detection")
+                        except:
+                            st.error("❌ Could not parse 'year_mon' column. Please ensure it's in YYYY-MM, YYYYMM, or MM/YYYY format")
+                            return False
+        else:
+            # If numeric, assume YYYYMM format
+            try:
+                df['date'] = pd.to_datetime(df['year_mon'].astype(str), format='%Y%m')
+                st.success("✅ Successfully parsed numeric year_mon as YYYYMM format")
+            except:
+                st.error("❌ Could not parse numeric year_mon column")
+                return False
+                
+    except Exception as e:
+        st.error(f"❌ Error creating date column from year_mon: {str(e)}")
         return False
+    
+    # Create hf_id column from hf_uid for consistency with existing code
+    df['hf_id'] = df['hf_uid']
+    st.info("✅ Created hf_id mapping from hf_uid")
+    
+    # Rename maltreat to treat for consistency with existing code
+    df['treat'] = df['maltreat']
+    st.info("✅ Mapped maltreat to treat for analysis")
     
     # Ensure numeric columns are numeric
     numeric_cols = ['allout', 'susp', 'test', 'conf', 'treat']
     for col in numeric_cols:
+        original_type = df[col].dtype
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        if original_type != df[col].dtype:
+            st.info(f"✅ Converted {col} to numeric (filled NaN with 0)")
     
+    st.success(f"✅ All validation checks passed! Date column created with {len(df)} records")
     return True
 
 def calculate_total_cases(df):
@@ -118,14 +165,14 @@ def method_who(df):
     results = []
     
     # Get unique health facilities
-    hf_list = df['hf_uid'].unique()
+    hf_list = df['hf_id'].unique()
     
     # Get all unique months in the dataset
     df['year_month'] = df['date'].dt.to_period('M')
     all_months = sorted(df['year_month'].unique())
     
     for hf in hf_list:
-        hf_data = df[df['hf_uid'] == hf].copy()
+        hf_data = df[df['hf_id'] == hf].copy()
         hf_data = hf_data.sort_values('date')
         
         # Find first active date (when total > 0)
@@ -147,7 +194,7 @@ def method_who(df):
                         reported = False
                     
                     results.append({
-                        'hf_uid': hf,
+                        'hf_id': hf,
                         'year_month': month,
                         'method': 'WHO',
                         'included_in_denominator': True,
@@ -165,14 +212,14 @@ def method_ousmane(df):
     results = []
     
     # Get unique health facilities
-    hf_list = df['hf_uid'].unique()
+    hf_list = df['hf_id'].unique()
     
     # Get all unique months in the dataset
     df['year_month'] = df['date'].dt.to_period('M')
     all_months = sorted(df['year_month'].unique())
     
     for hf in hf_list:
-        hf_data = df[df['hf_uid'] == hf].copy()
+        hf_data = df[df['hf_id'] == hf].copy()
         hf_data = hf_data.sort_values('date')
         
         # Create a complete month series for this HF
@@ -200,7 +247,7 @@ def method_ousmane(df):
                 reported = hf_months.get(month, False)
                 
                 results.append({
-                    'hf_uid': hf,
+                    'hf_id': hf,
                     'year_month': month,
                     'method': 'Ousmane',
                     'included_in_denominator': included,
@@ -211,7 +258,7 @@ def method_ousmane(df):
                 # For first 5 months, include all HFs
                 reported = hf_months.get(month, False)
                 results.append({
-                    'hf_uid': hf,
+                    'hf_id': hf,
                     'year_month': month,
                     'method': 'Ousmane',
                     'included_in_denominator': True,
@@ -229,7 +276,7 @@ def method_mohamed(df):
     results = []
     
     # Get unique health facilities
-    hf_list = df['hf_uid'].unique()
+    hf_list = df['hf_id'].unique()
     
     # Get all unique months in the dataset
     df['year_month'] = df['date'].dt.to_period('M')
@@ -237,7 +284,7 @@ def method_mohamed(df):
     max_date = df['date'].max()
     
     for hf in hf_list:
-        hf_data = df[df['hf_uid'] == hf].copy()
+        hf_data = df[df['hf_id'] == hf].copy()
         hf_data = hf_data.sort_values('date')
         
         # Find first reporting date
@@ -352,7 +399,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader(
         "Upload your data file",
         type=['csv', 'xlsx', 'xls'],
-        help="File should contain: hf_id, date, allout, susp, test, conf, treat"
+        help="File should contain: hf_uid, year_mon, allout, susp, test, conf, maltreat"
     )
     
     if uploaded_file is not None:
@@ -375,51 +422,74 @@ with st.sidebar:
                 # Show data summary
                 st.subheader("📋 Data Summary")
                 st.write(f"**Date range:** {df['date'].min().date()} to {df['date'].max().date()}")
-                st.write(f"**Health facilities:** {df['hf_id'].nunique()}")
+                st.write(f"**Health facilities:** {df['hf_uid'].nunique()}")
                 st.write(f"**Total records:** {len(df)}")
+                
+                # Show sample of data
+                with st.expander("🔍 View Sample Data"):
+                    display_cols = ['hf_uid', 'year_mon', 'date', 'allout', 'susp', 'test', 'conf', 'maltreat', 'total_cases']
+                    available_cols = [col for col in display_cols if col in df.columns]
+                    st.dataframe(df[available_cols].head(10), use_container_width=True)
                 
         except Exception as e:
             st.error(f"❌ Error reading file: {str(e)}")
     
     # Sample data option
     if st.session_state.df is None and st.button("📊 Use Sample Data"):
-        # Create sample data
+        # Create sample data with correct column names
         np.random.seed(42)
-        dates = pd.date_range('2023-01-01', '2024-12-31', freq='M')
-        hf_ids = [f'HF_{i:03d}' for i in range(1, 51)]  # 50 health facilities
+        year_months = pd.period_range('2023-01', '2024-12', freq='M')
+        hf_uids = [f'HF_{i:03d}' for i in range(1, 51)]  # 50 health facilities
         
         sample_data = []
-        for hf in hf_ids:
-            for date in dates:
+        for hf in hf_uids:
+            for year_mon in year_months:
                 # Simulate different reporting patterns
                 if np.random.random() > 0.3:  # 70% chance of reporting
                     allout = np.random.poisson(5)
                     susp = np.random.poisson(3)
                     test = np.random.poisson(4)
                     conf = np.random.poisson(2)
-                    treat = np.random.poisson(2)
+                    maltreat = np.random.poisson(2)
                 else:
-                    allout = susp = test = conf = treat = 0
+                    allout = susp = test = conf = maltreat = 0
                 
                 sample_data.append({
                     'hf_uid': hf,
-                    'date': date,
+                    'year_mon': str(year_mon),
                     'allout': allout,
                     'susp': susp,
                     'test': test,
                     'conf': conf,
-                    'treat': treat
+                    'maltreat': maltreat
                 })
         
         df = pd.DataFrame(sample_data)
-        df = calculate_total_cases(df)
-        st.session_state.df = df
-        st.success("✅ Sample data loaded!")
-        st.rerun()
+        
+        # Validate and process the sample data
+        if validate_data(df):
+            df = calculate_total_cases(df)
+            st.session_state.df = df
+            st.success("✅ Sample data loaded!")
+            
+            # Show what columns were created
+            st.info("📋 Columns in processed data:")
+            st.write(f"Original columns: {list(pd.DataFrame(sample_data).columns)}")
+            st.write(f"After processing: {list(df.columns)}")
+            st.rerun()
 
 # Main content
 if st.session_state.df is not None:
     df = st.session_state.df
+    
+    # Debug section - show current dataframe structure
+    with st.expander("🔍 Current Data Structure"):
+        st.write("**Available Columns:**")
+        st.write(list(df.columns))
+        st.write("**Data Types:**")
+        st.write(df.dtypes)
+        st.write("**Sample Records:**")
+        st.dataframe(df.head(3), use_container_width=True)
     
     st.subheader("🔍 Method Descriptions")
     
@@ -620,13 +690,20 @@ else:
         
         <h4>Required Columns:</h4>
         <ul>
-            <li><strong>hf_id:</strong> Health facility identifier</li>
-            <li><strong>date:</strong> Date of the report</li>
+            <li><strong>hf_uid:</strong> Health facility unique identifier</li>
+            <li><strong>year_mon:</strong> Year-month in YYYY-MM or YYYYMM format</li>
             <li><strong>allout:</strong> All-out cases</li>
             <li><strong>susp:</strong> Suspected cases</li>
             <li><strong>test:</strong> Test cases</li>
             <li><strong>conf:</strong> Confirmed cases</li>
-            <li><strong>treat:</strong> Treatment cases</li>
+            <li><strong>maltreat:</strong> Malaria treatment cases</li>
+        </ul>
+        
+        <h4>Data Processing:</h4>
+        <ul>
+            <li>A <strong>date</strong> column will be automatically created from <strong>year_mon</strong></li>
+            <li>Total cases = allout + susp + test + conf + maltreat</li>
+            <li>Reporting status = total cases > 0</li>
         </ul>
         
         <p>The tool will calculate reporting rates using three different methods and provide comprehensive analysis and visualizations.</p>
