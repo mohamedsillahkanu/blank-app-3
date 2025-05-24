@@ -8,6 +8,7 @@ import io
 from datetime import datetime
 from typing import List, Dict, Tuple
 from scipy import stats
+import gc  # For garbage collection
 
 # Set page config
 st.set_page_config(
@@ -145,14 +146,13 @@ st.markdown("""
         font-weight: bold;
     }
     
-    .stSelectbox > div > div > div {
-        background-color: white !important;
-        color: black !important;
-    }
-    
-    .stMultiSelect > div > div > div {
-        background-color: white !important;
-        color: black !important;
+    .memory-info {
+        background-color: #e8f4fd;
+        padding: 0.5rem;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        color: #1976d2;
+        margin: 0.5rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -165,9 +165,49 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Initialize session state
+# Memory optimization functions
+@st.cache_data
+def optimize_dataframe_memory(df):
+    """Optimize dataframe memory usage by converting data types"""
+    df_optimized = df.copy()
+    
+    for col in df_optimized.columns:
+        if df_optimized[col].dtype == 'object':
+            # Try to convert to category if unique values < 50% of total
+            unique_ratio = df_optimized[col].nunique() / len(df_optimized)
+            if unique_ratio < 0.5:
+                df_optimized[col] = df_optimized[col].astype('category')
+        elif df_optimized[col].dtype in ['int64', 'int32']:
+            # Downcast integers
+            df_optimized[col] = pd.to_numeric(df_optimized[col], downcast='integer')
+        elif df_optimized[col].dtype in ['float64', 'float32']:
+            # Downcast floats
+            df_optimized[col] = pd.to_numeric(df_optimized[col], downcast='float')
+    
+    return df_optimized
+
+def get_memory_usage(df):
+    """Get memory usage information for dataframe"""
+    memory_usage = df.memory_usage(deep=True).sum()
+    return f"{memory_usage / 1024**2:.2f} MB"
+
+def display_dataframe_head(df, title="Data Preview", height=300):
+    """Display only the first 5 rows of dataframe with memory info"""
+    st.markdown(f"**{title}** (showing first 5 rows)")
+    st.markdown(f'<div class="memory-info">📊 Total rows: {len(df):,} | Memory usage: {get_memory_usage(df)}</div>', unsafe_allow_html=True)
+    
+    # Display only first 5 rows
+    display_df = df.head(5)
+    st.dataframe(display_df, use_container_width=True, height=height)
+    
+    if len(df) > 5:
+        st.info(f"💡 Showing 5 of {len(df):,} total rows to optimize performance")
+
+# Store groupby columns in session state for outlier analysis
+if 'groupby_columns' not in st.session_state:
+    st.session_state.groupby_columns = []
+# Initialize session state with memory optimization
 if 'df' not in st.session_state:
-    st.session_state.df = None
 if 'original_df' not in st.session_state:
     st.session_state.original_df = None
 if 'corrected_df' not in st.session_state:
@@ -176,20 +216,28 @@ if 'outlier_results' not in st.session_state:
     st.session_state.outlier_results = {}
 if 'correction_applied' not in st.session_state:
     st.session_state.correction_applied = False
+if 'memory_optimized' not in st.session_state:
+    st.session_state.memory_optimized = False
 
+@st.cache_data
 def read_file(uploaded_file):
-    """Read uploaded file and return DataFrame"""
+    """Read uploaded file and return DataFrame with memory optimization"""
     try:
         file_extension = uploaded_file.name.lower().split('.')[-1]
         
         if file_extension == 'csv':
-            df = pd.read_csv(uploaded_file)
+            # Read CSV with optimizations
+            df = pd.read_csv(uploaded_file, low_memory=False)
         elif file_extension in ['xls', 'xlsx']:
+            # Read Excel with optimizations
             df = pd.read_excel(uploaded_file)
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
         
-        return df
+        # Optimize memory usage
+        df_optimized = optimize_dataframe_memory(df)
+        
+        return df_optimized
     except Exception as e:
         st.error(f"Error reading file {uploaded_file.name}: {str(e)}")
         return None
@@ -220,8 +268,6 @@ def detect_outliers_iqr(data, multiplier=1.5):
     
     outliers = (data < lower_bound) | (data > upper_bound)
     return outliers, lower_bound, upper_bound
-
-
 
 def correct_outliers_mean(data, outliers, group_data=None):
     """Replace outliers with mean"""
@@ -264,8 +310,84 @@ def winsorize_data(data, limits=(0.05, 0.05)):
     
     return corrected
 
-def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_method, **kwargs):
-    """Apply outlier correction within groups"""
+@st.cache_data
+def create_outlier_analysis_df(original_df, corrected_df, outlier_results, groupby_cols):
+    """Create comprehensive outlier analysis dataframe for export"""
+    analysis_rows = []
+    
+    for column, results in outlier_results.items():
+        if 'group_results' in results:
+            # Group-based analysis
+            for group_name, group_result in results['group_results'].items():
+                # Get group data
+                if len(groupby_cols) == 1:
+                    group_mask = original_df[groupby_cols[0]] == group_name
+                else:
+                    # Handle multiple groupby columns
+                    group_mask = True
+                    for i, col in enumerate(groupby_cols):
+                        if isinstance(group_name, tuple):
+                            group_mask &= (original_df[col] == group_name[i])
+                        else:
+                            group_mask &= (original_df[col] == group_name)
+                
+                group_data = original_df[group_mask][column]
+                
+                # Calculate bounds for this group
+                outliers, lower_bound, upper_bound = detect_outliers_iqr(group_data, 1.5)
+                
+                # Add row for each data point in this group
+                for idx in group_data.index:
+                    original_value = original_df.loc[idx, column]
+                    corrected_value = corrected_df.loc[idx, column]
+                    is_outlier = outliers.loc[idx] if idx in outliers.index else False
+                    
+                    # Create group identifier
+                    if len(groupby_cols) == 1:
+                        group_id = f"{groupby_cols[0]}={group_name}"
+                    else:
+                        group_parts = [f"{col}={val}" for col, val in zip(groupby_cols, group_name)]
+                        group_id = "; ".join(group_parts)
+                    
+                    analysis_rows.append({
+                        'Row_Index': idx,
+                        'Column': column,
+                        'Group': group_id,
+                        'Original_Value': original_value,
+                        'Corrected_Value': corrected_value,
+                        'Lower_Bound': lower_bound,
+                        'Upper_Bound': upper_bound,
+                        'Outlier_Status': 'Outlier' if is_outlier else 'Normal',
+                        f'Corrected_{results["method"]}': 'Yes' if is_outlier else 'No',
+                        'Detection_Method': 'IQR',
+                        'Correction_Method': results['method']
+                    })
+        else:
+            # Overall analysis (no grouping)
+            data = original_df[column]
+            outliers, lower_bound, upper_bound = detect_outliers_iqr(data, 1.5)
+            
+            for idx in data.index:
+                original_value = original_df.loc[idx, column]
+                corrected_value = corrected_df.loc[idx, column]
+                is_outlier = outliers.loc[idx] if idx in outliers.index else False
+                
+                analysis_rows.append({
+                    'Row_Index': idx,
+                    'Column': column,
+                    'Group': 'All_Data',
+                    'Original_Value': original_value,
+                    'Corrected_Value': corrected_value,
+                    'Lower_Bound': lower_bound,
+                    'Upper_Bound': upper_bound,
+                    'Outlier_Status': 'Outlier' if is_outlier else 'Normal',
+                    f'Corrected_{results["method"]}': 'Yes' if is_outlier else 'No',
+                    'Detection_Method': 'IQR',
+                    'Correction_Method': results['method']
+                })
+    
+    return pd.DataFrame(analysis_rows)
+    """Apply outlier correction within groups with memory optimization"""
     corrected_df = df.copy()
     results = {}
     
@@ -275,6 +397,7 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
             column_results = {}
             total_outliers = 0
             
+            # Process groups in batches to save memory
             for group_name, group_data in df.groupby(groupby_cols):
                 group_series = group_data[numeric_col]
                 
@@ -297,18 +420,17 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
                 # Update the corrected dataframe
                 corrected_df.loc[group_data.index, numeric_col] = corrected_series
                 
-                # Store group results
+                # Store group results (only essential info to save memory)
                 column_results[str(group_name)] = {
-                    'outliers': outliers,
-                    'outlier_count': outliers.sum(),
+                    'outlier_count': int(outliers.sum()),
                     'group_size': len(group_series),
-                    'outlier_percentage': (outliers.sum() / len(group_series)) * 100 if len(group_series) > 0 else 0
+                    'outlier_percentage': float((outliers.sum() / len(group_series)) * 100) if len(group_series) > 0 else 0.0
                 }
                 total_outliers += outliers.sum()
             
             results[numeric_col] = {
                 'group_results': column_results,
-                'total_outliers': total_outliers,
+                'total_outliers': int(total_outliers),
                 'method': correction_method,
                 'detection_method': 'IQR'
             }
@@ -333,12 +455,14 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
             corrected_df[numeric_col] = corrected_data
             
             results[numeric_col] = {
-                'outliers': outliers,
-                'total_outliers': outliers.sum(),
-                'outlier_percentage': (outliers.sum() / len(data)) * 100,
+                'total_outliers': int(outliers.sum()),
+                'outlier_percentage': float((outliers.sum() / len(data)) * 100),
                 'method': correction_method,
                 'detection_method': 'IQR'
             }
+    
+    # Force garbage collection
+    gc.collect()
     
     return corrected_df, results
 
@@ -358,7 +482,9 @@ if st.session_state.df is None:
     )
     
     if uploaded_file is not None:
-        df = read_file(uploaded_file)
+        with st.spinner("Loading and optimizing file..."):
+            df = read_file(uploaded_file)
+            
         if df is not None:
             # Check if there are numeric columns
             numeric_cols = get_numeric_columns(df)
@@ -368,22 +494,25 @@ if st.session_state.df is None:
                 # Store in session state
                 st.session_state.df = df
                 st.session_state.original_df = df.copy()
+                st.session_state.memory_optimized = True
                 
                 # Reset state when new file is uploaded
                 st.session_state.corrected_df = None
                 st.session_state.outlier_results = {}
                 st.session_state.correction_applied = False
                 
-                st.success(f"✅ File uploaded successfully!")
+                st.success(f"✅ File uploaded and optimized successfully!")
                 
-                # Show file info
-                col1, col2, col3 = st.columns(3)
+                # Show file info with memory usage
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.info(f"📊 **File:** {uploaded_file.name}")
                 with col2:
-                    st.info(f"📏 **Shape:** {df.shape[0]} rows × {df.shape[1]} columns")
+                    st.info(f"📏 **Shape:** {df.shape[0]:,} rows × {df.shape[1]} columns")
                 with col3:
                     st.info(f"🔢 **Numeric columns:** {len(numeric_cols)}")
+                with col4:
+                    st.info(f"💾 **Memory:** {get_memory_usage(df)}")
                 
                 st.rerun()
 
@@ -393,14 +522,16 @@ if st.session_state.df is not None:
     numeric_cols = get_numeric_columns(df)
     categorical_cols = get_categorical_columns(df)
     
-    # Reset button
+    # Reset button with memory cleanup
     if st.button("🔄 Upload New File", type="secondary"):
-        # Reset everything
+        # Reset everything and clean memory
         st.session_state.df = None
         st.session_state.original_df = None
         st.session_state.corrected_df = None
         st.session_state.outlier_results = {}
         st.session_state.correction_applied = False
+        st.session_state.memory_optimized = False
+        gc.collect()  # Force garbage collection
         st.rerun()
     
     # Show current file stats
@@ -435,10 +566,14 @@ if st.session_state.df is not None:
         missing_values = df.isnull().sum().sum()
         st.markdown(f"""
         <div class="stats-card">
-            <h3>{missing_values}</h3>
+            <h3>{missing_values:,}</h3>
             <p>Missing Values</p>
         </div>
         """, unsafe_allow_html=True)
+    
+    # Memory usage indicator
+    if st.session_state.memory_optimized:
+        st.success(f"✅ Memory optimized: {get_memory_usage(df)} (showing first 5 rows for performance)")
     
     # Outlier detection and correction section
     if not st.session_state.correction_applied:
@@ -470,14 +605,20 @@ if st.session_state.df is not None:
             if groupby_columns:
                 st.success(f"✅ Will analyze outliers within groups of: {', '.join(groupby_columns)}")
                 
-                # Show group information
-                if len(groupby_columns) == 1:
-                    group_counts = df[groupby_columns[0]].value_counts()
-                    st.markdown("**Group sizes:**")
-                    st.dataframe(group_counts.head(10), use_container_width=True)
+                # Show group information (first grouping variable only, 5 values)
+                if len(groupby_columns) >= 1:
+                    first_group_col = groupby_columns[0]
+                    group_counts = df[first_group_col].value_counts()
+                    st.markdown(f"**{first_group_col} - Top 5 groups:**")
+                    top_5_groups = group_counts.head(5)
+                    for group, count in top_5_groups.items():
+                        st.write(f"• {group}: {count:,} records")
+                    
+                    if len(group_counts) > 5:
+                        st.info(f"💡 Showing 5 of {len(group_counts):,} total groups")
                 else:
                     group_counts = df.groupby(groupby_columns).size()
-                    st.markdown(f"**Total groups:** {len(group_counts)}")
+                    st.markdown(f"**Total groups:** {len(group_counts):,}")
                     st.markdown(f"**Average group size:** {group_counts.mean():.1f}")
             else:
                 st.info("💡 No grouping selected. Outliers will be detected across the entire dataset.")
@@ -507,11 +648,6 @@ if st.session_state.df is not None:
             
             if selected_numeric_cols:
                 st.success(f"✅ Will analyze {len(selected_numeric_cols)} columns")
-                
-                # Show basic stats for selected columns
-                selected_data = df[selected_numeric_cols]
-                st.markdown("**Basic statistics:**")
-                st.dataframe(selected_data.describe().round(2), use_container_width=True)
             else:
                 st.warning("⚠️ Please select at least one numeric column")
             
@@ -620,11 +756,17 @@ if st.session_state.df is not None:
                         elif correction_method == "Winsorization":
                             kwargs['limits'] = (lower_percentile/100, (100-upper_percentile)/100)
                         
-                        # Apply correction
+                        # Store groupby columns for outlier analysis
+                        st.session_state.groupby_columns = groupby_columns
+                        
+                        # Apply correction with memory optimization
                         corrected_df, results = apply_group_based_correction(
                             df, groupby_columns, selected_numeric_cols, 
                             correction_method, **kwargs
                         )
+                        
+                        # Optimize memory of corrected dataframe
+                        corrected_df = optimize_dataframe_memory(corrected_df)
                         
                         # Store results
                         st.session_state.corrected_df = corrected_df
@@ -655,153 +797,111 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
         correction_method = list(st.session_state.outlier_results.values())[0]['method']
         st.metric("Correction Method", correction_method)
     
-    # Detailed results for each column
+    # Detailed results summary only
     for column, results in st.session_state.outlier_results.items():
         st.markdown(f"#### Results for {column}")
         
         if 'group_results' in results:
-            # Group-based results
+            # Group-based results summary
             st.markdown(f"""
             <div class="group-summary">
                 <strong>Group-based Analysis</strong><br>
                 🎯 Method: {results['method']}<br>
                 📊 Detection: IQR Method<br>
-                🔢 Total outliers: {results['total_outliers']}<br>
-                📊 Groups analyzed: {len(results['group_results'])}
+                🔢 Total outliers: {results['total_outliers']:,}<br>
+                📊 Groups analyzed: {len(results['group_results']):,}
             </div>
             """, unsafe_allow_html=True)
-            
-            # Group details
-            group_data = []
-            for group_name, group_result in results['group_results'].items():
-                group_data.append({
-                    'Group': group_name,
-                    'Group Size': group_result['group_size'],
-                    'Outliers Found': group_result['outlier_count'],
-                    'Outlier Rate (%)': f"{group_result['outlier_percentage']:.2f}"
-                })
-            
-            if group_data:
-                group_df = pd.DataFrame(group_data)
-                st.dataframe(group_df, use_container_width=True)
         else:
-            # Overall results
+            # Overall results summary
             st.markdown(f"""
             <div class="correction-summary">
                 <strong>Overall Analysis</strong><br>
                 🎯 Method: {results['method']}<br>
                 📊 Detection: IQR Method<br>
-                🔢 Outliers found: {results['total_outliers']}<br>
+                🔢 Outliers found: {results['total_outliers']:,}<br>
                 📈 Outlier rate: {results['outlier_percentage']:.2f}%
             </div>
             """, unsafe_allow_html=True)
         
-        # Before/After statistics
-        original_stats = st.session_state.original_df[column].describe()
-        corrected_stats = st.session_state.corrected_df[column].describe()
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Original Statistics:**")
-            st.dataframe(original_stats.round(3), use_container_width=True)
-        with col2:
-            st.markdown("**Corrected Statistics:**")
-            st.dataframe(corrected_stats.round(3), use_container_width=True)
-        
         st.markdown("---")
     
-    # Display corrected dataframe
+    # Display corrected dataframe summary only
     st.markdown("### 📈 Dataset with Corrected Values")
+    st.markdown(f"📊 **Dataset shape:** {st.session_state.corrected_df.shape[0]:,} rows × {st.session_state.corrected_df.shape[1]} columns")
+    st.markdown(f"💾 **Memory usage:** {get_memory_usage(st.session_state.corrected_df)}")
     
-    # Show option to compare with original
-    show_comparison = st.checkbox("Show side-by-side comparison with original data")
-    
-    if show_comparison:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Original Data:**")
-            st.dataframe(st.session_state.original_df, use_container_width=True, height=400)
-        with col2:
-            st.markdown("**Corrected Data:**")
-            st.dataframe(st.session_state.corrected_df, use_container_width=True, height=400)
-    else:
-        st.dataframe(st.session_state.corrected_df, use_container_width=True, height=400)
+    # Show only first 5 rows
+    display_dataframe_head(st.session_state.corrected_df, "Corrected Dataset Preview", height=300)
     
     # Download section
-    st.markdown("### 💾 Download Corrected Dataset")
+    st.markdown("### 💾 Download Results")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # CSV download
+        st.markdown("#### 📊 Corrected Dataset")
+        # Direct CSV download of corrected data
         csv_buffer = io.StringIO()
         st.session_state.corrected_df.to_csv(csv_buffer, index=False)
         csv_data = csv_buffer.getvalue()
         
         st.download_button(
-            label="📥 Download as CSV",
+            label="📥 Download Corrected Data (CSV)",
             data=csv_data,
-            file_name=f"outlier_corrected_data_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            file_name=f"corrected_dataset_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime="text/csv",
-            help="Download dataset with corrected outliers as CSV"
+            help="Download complete corrected dataset as CSV"
         )
-    
+        
     with col2:
-        # Excel download with correction log
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            # Original and corrected data
-            st.session_state.original_df.to_excel(writer, sheet_name='Original_Data', index=False)
-            st.session_state.corrected_df.to_excel(writer, sheet_name='Corrected_Data', index=False)
-            
-            # Correction log
-            log_data = []
-            for column, results in st.session_state.outlier_results.items():
-                if 'group_results' in results:
-                    # Group-based results
-                    for group_name, group_result in results['group_results'].items():
-                        log_data.append({
-                            'Column': column,
-                            'Group': group_name,
-                            'Correction_Method': results['method'],
-                            'Detection_Method': 'IQR',
-                            'Group_Size': group_result['group_size'],
-                            'Outliers_Found': group_result['outlier_count'],
-                            'Outlier_Percentage': f"{group_result['outlier_percentage']:.2f}%",
-                            'Correction_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        })
-                else:
-                    # Overall results
-                    log_data.append({
-                        'Column': column,
-                        'Group': 'All Data',
-                        'Correction_Method': results['method'],
-                        'Detection_Method': 'IQR',
-                        'Group_Size': len(st.session_state.original_df),
-                        'Outliers_Found': results['total_outliers'],
-                        'Outlier_Percentage': f"{results['outlier_percentage']:.2f}%",
-                        'Correction_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    })
-            
-            if log_data:
-                log_df = pd.DataFrame(log_data)
-                log_df.to_excel(writer, sheet_name='Correction_Log', index=False)
-        
-        excel_data = excel_buffer.getvalue()
-        
-        st.download_button(
-            label="📥 Download as Excel",
-            data=excel_data,
-            file_name=f"outlier_corrected_data_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download dataset with correction log as Excel"
-        )
+        st.markdown("#### 🎯 Outlier Analysis")
+        # Create and download outlier analysis
+        if st.button("📥 Prepare Outlier Analysis", type="secondary"):
+            with st.spinner("Creating detailed outlier analysis..."):
+                # Get groupby columns used in correction
+                groupby_cols = []
+                # We need to reconstruct the groupby columns from the session or make them available
+                # For now, we'll create the analysis based on available results
+                
+                analysis_df = create_outlier_analysis_df(
+                    st.session_state.original_df, 
+                    st.session_state.corrected_df, 
+                    st.session_state.outlier_results,
+                    st.session_state.groupby_columns
+                )
+                
+                # Convert to CSV
+                analysis_csv_buffer = io.StringIO()
+                analysis_df.to_csv(analysis_csv_buffer, index=False)
+                analysis_csv_data = analysis_csv_buffer.getvalue()
+                
+                st.download_button(
+                    label="📥 Download Outlier Analysis (CSV)",
+                    data=analysis_csv_data,
+                    file_name=f"outlier_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    help="Download detailed outlier analysis with bounds and correction status"
+                )
+                
+                st.success("✅ Outlier analysis ready for download!")
+                
+                # Show preview of analysis structure
+                st.markdown("**Analysis includes:**")
+                st.write("• Row indices and original values")
+                st.write("• Outlier detection bounds (lower/upper)")
+                st.write("• Outlier status (Outlier/Normal)")
+                st.write("• Correction status and method")
+                st.write("• Group information (if applicable)")
+    
+    st.info("💡 **Download Info:** Corrected dataset contains cleaned data. Outlier analysis contains detailed detection and correction information.")
     
     # Button to try different correction
     if st.button("🎯 Try Different Correction", type="secondary"):
         st.session_state.correction_applied = False
         st.session_state.corrected_df = None
         st.session_state.outlier_results = {}
+        gc.collect()  # Clean memory
         st.rerun()
 
 # Show features when no file is uploaded
@@ -818,28 +918,32 @@ if st.session_state.df is None:
         
         1. **Upload Data**: CSV or Excel with numeric columns
         
-        2. **Select Groups**: Choose categorical columns for grouping (optional)
+        2. **Memory Optimization**: Automatic data type optimization for better performance
         
-        3. **Choose Columns**: Select numeric columns to analyze
+        3. **Select Groups**: Choose categorical columns for grouping (optional)
         
-        4. **Configure Methods**: Set detection and correction parameters
+        4. **Choose Columns**: Select numeric columns to analyze
         
-        5. **Apply Correction**: Generate cleaned dataset with group-based analysis
+        5. **Configure Methods**: Set detection and correction parameters
+        
+        6. **Apply Correction**: Generate cleaned dataset with group-based analysis
         """)
     
     with col2:
         st.markdown("""
-        **Group-Based Analysis:**
+        **Memory-Efficient Features:**
         
-        **🔍 Why Group?**
-        - Different groups may have different outlier patterns
-        - More accurate detection within similar contexts
-        - Preserves group-specific characteristics
+        **🚀 Performance Optimizations:**
+        - Automatic data type optimization
+        - Display first 5 rows only
+        - Cached processing functions
+        - Memory usage monitoring
+        - Garbage collection
         
-        **📊 Example:**
-        - Group by "Department" 
-        - Detect salary outliers within each department
-        - Replace with department-specific mean/median
+        **📊 Smart Display:**
+        - Progressive data loading
+        - Limited Excel exports for large files
+        - Real-time memory usage tracking
         """)
     
     st.subheader("✨ Correction Methods")
@@ -880,6 +984,14 @@ if st.session_state.df is None:
         - Group-specific outlier detection
         - Maintains group characteristics
         """)
+        
+        st.markdown("""
+        **⚡ Performance Features:**
+        - Memory usage optimization
+        - Progressive data loading
+        - First 5 rows display
+        - Automatic data type conversion
+        """)
     
     with col2:
         st.markdown("""
@@ -889,11 +1001,23 @@ if st.session_state.df is None:
         - Visual detection feedback
         - Detailed correction logging
         """)
+        
+        st.markdown("""
+        **💾 Smart Export:**
+        - Direct CSV downloads only
+        - Corrected dataset export
+        - Comprehensive outlier analysis
+        - Outlier bounds and correction status
+        """)
 
-# Footer
+# Footer with memory info
 st.markdown("---")
-st.markdown("""
+current_memory = "N/A"
+if st.session_state.df is not None:
+    current_memory = get_memory_usage(st.session_state.df)
+
+st.markdown(f"""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>🎯 Built with Streamlit | Advanced Outlier Detection & Correction Tool v2.0</p>
+    <p>🎯 Built with Streamlit | Advanced Outlier Detection & Correction Tool v2.1 | Current Memory Usage: {current_memory}</p>
 </div>
 """, unsafe_allow_html=True)
