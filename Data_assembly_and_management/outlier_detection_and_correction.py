@@ -614,22 +614,6 @@ if st.session_state.df is not None:
             
             if groupby_columns:
                 st.success(f"✅ Will analyze outliers within groups of: {', '.join(groupby_columns)}")
-                
-                # Show group information (first grouping variable only, 5 values)
-                if len(groupby_columns) >= 1:
-                    first_group_col = groupby_columns[0]
-                    group_counts = df[first_group_col].value_counts()
-                    st.markdown(f"**{first_group_col} - Top 5 groups:**")
-                    top_5_groups = group_counts.head(5)
-                    for group, count in top_5_groups.items():
-                        st.write(f"• {group}: {count:,} records")
-                    
-                    if len(group_counts) > 5:
-                        st.info(f"💡 Showing 5 of {len(group_counts):,} total groups")
-                else:
-                    group_counts = df.groupby(groupby_columns).size()
-                    st.markdown(f"**Total groups:** {len(group_counts):,}")
-                    st.markdown(f"**Average group size:** {group_counts.mean():.1f}")
             else:
                 st.info("💡 No grouping selected. Outliers will be detected across the entire dataset.")
             
