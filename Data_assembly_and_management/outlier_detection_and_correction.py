@@ -320,6 +320,86 @@ def winsorize_data(data, limits=(0.05, 0.05)):
     
     return corrected
 
+def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_method, **kwargs):
+    """Apply outlier correction within groups with memory optimization"""
+    corrected_df = df.copy()
+    results = {}
+    
+    if groupby_cols:
+        # Group-based correction
+        for numeric_col in numeric_cols:
+            column_results = {}
+            total_outliers = 0
+            
+            # Process groups in batches to save memory
+            for group_name, group_data in df.groupby(groupby_cols):
+                group_series = group_data[numeric_col]
+                
+                if len(group_series.dropna()) < 3:  # Skip groups with too few observations
+                    continue
+                
+                # Detect outliers within group using IQR method
+                outliers, _, _ = detect_outliers_iqr(group_series, kwargs.get('iqr_multiplier', 1.5))
+                
+                # Apply correction
+                if correction_method == "Mean":
+                    corrected_series = correct_outliers_mean(group_series, outliers, group_series)
+                elif correction_method == "Median":
+                    corrected_series = correct_outliers_median(group_series, outliers, group_series)
+                elif correction_method == "Moving Average":
+                    corrected_series = correct_outliers_moving_average(group_series, outliers, kwargs.get('window', 5))
+                elif correction_method == "Winsorization":
+                    corrected_series = winsorize_data(group_series, kwargs.get('limits', (0.05, 0.05)))
+                
+                # Update the corrected dataframe
+                corrected_df.loc[group_data.index, numeric_col] = corrected_series
+                
+                # Store group results (only essential info to save memory)
+                column_results[str(group_name)] = {
+                    'outlier_count': int(outliers.sum()),
+                    'group_size': len(group_series),
+                    'outlier_percentage': float((outliers.sum() / len(group_series)) * 100) if len(group_series) > 0 else 0.0
+                }
+                total_outliers += outliers.sum()
+            
+            results[numeric_col] = {
+                'group_results': column_results,
+                'total_outliers': int(total_outliers),
+                'method': correction_method,
+                'detection_method': 'IQR'
+            }
+    else:
+        # No grouping - apply to entire dataset
+        for numeric_col in numeric_cols:
+            data = df[numeric_col]
+            
+            # Detect outliers using IQR method
+            outliers, _, _ = detect_outliers_iqr(data, kwargs.get('iqr_multiplier', 1.5))
+            
+            # Apply correction
+            if correction_method == "Mean":
+                corrected_data = correct_outliers_mean(data, outliers)
+            elif correction_method == "Median":
+                corrected_data = correct_outliers_median(data, outliers)
+            elif correction_method == "Moving Average":
+                corrected_data = correct_outliers_moving_average(data, outliers, kwargs.get('window', 5))
+            elif correction_method == "Winsorization":
+                corrected_data = winsorize_data(data, kwargs.get('limits', (0.05, 0.05)))
+            
+            corrected_df[numeric_col] = corrected_data
+            
+            results[numeric_col] = {
+                'total_outliers': int(outliers.sum()),
+                'outlier_percentage': float((outliers.sum() / len(data)) * 100),
+                'method': correction_method,
+                'detection_method': 'IQR'
+            }
+    
+    # Force garbage collection
+    gc.collect()
+    
+    return corrected_df, results
+
 @st.cache_data
 def create_outlier_analysis_df(original_df, corrected_df, outlier_results, groupby_cols):
     """Create comprehensive outlier analysis dataframe for export"""
