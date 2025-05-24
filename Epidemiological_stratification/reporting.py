@@ -368,14 +368,57 @@ def create_visualizations(monthly_rates, method_results):
         height=500
     )
     
-    # 3. Summary statistics table
+    # 3. Individual heatmaps for each method showing reporting status by HF and month
+    method_heatmaps = {}
+    for method in ['WHO', 'Ousmane', 'Mohamed']:
+        method_data = method_results[method_results['method'] == method].copy()
+        if len(method_data) > 0:
+            # Convert year_month to string for proper ordering
+            method_data['month_str'] = method_data['year_month'].astype(str)
+            
+            # Create pivot table for heatmap
+            pivot_data = method_data.pivot_table(
+                index='hf_uid', 
+                columns='month_str', 
+                values='reported', 
+                fill_value=0
+            )
+            
+            # Create heatmap
+            fig_heatmap = px.imshow(
+                pivot_data.values,
+                x=pivot_data.columns,
+                y=pivot_data.index,
+                color_continuous_scale='viridis',
+                title=f'{method} Method: Reporting Status by Health Facility and Month',
+                labels={'x': 'Date (YYYY-MM)', 'y': 'Health Facility UID', 'color': 'Reported'},
+                aspect='auto'
+            )
+            
+            fig_heatmap.update_layout(
+                height=max(400, len(pivot_data) * 20),  # Adjust height based on number of HFs
+                xaxis_tickangle=45
+            )
+            
+            # Update colorbar
+            fig_heatmap.update_coloraxes(
+                colorbar_title="Reporting Status",
+                colorbar=dict(
+                    tickvals=[0, 1],
+                    ticktext=['Not Reported', 'Reported']
+                )
+            )
+            
+            method_heatmaps[method] = fig_heatmap
+    
+    # 4. Summary statistics table
     summary_stats = monthly_rates.groupby('method').agg({
         'reporting_rate': ['mean', 'min', 'max', 'std'],
         'included_in_denominator': ['mean', 'min', 'max'],
         'reported': 'mean'
     }).round(2)
     
-    return fig1, fig2, summary_stats
+    return fig1, fig2, method_heatmaps, summary_stats
 
 # File upload section (in main area, not sidebar)
 st.header("📁 Data Upload")
@@ -398,11 +441,11 @@ if uploaded_file is not None:
         st.info(f"📊 Shape: {df.shape[0]} rows × {df.shape[1]} columns")
         
         # Show original data structure
-        with st.expander("🔍 Original Data Structure"):
+        with st.expander("🔍 Original Data Structure (First 10 rows)"):
             st.write("**Original Columns:**")
             st.write(list(df.columns))
             st.write("**Sample Records:**")
-            st.dataframe(df.head(3), use_container_width=True)
+            st.dataframe(df.head(10), use_container_width=True)
         
         # Validate data
         if validate_data(df):
@@ -417,7 +460,7 @@ if uploaded_file is not None:
             st.write(f"**Total records:** {len(df)}")
             
             # Show processed data
-            with st.expander("🔍 View Processed Data"):
+            with st.expander("🔍 View Processed Data (First 10 rows)"):
                 display_cols = ['hf_uid', 'month', 'year', 'year_mon', 'date', 'allout', 'susp', 'test', 'conf', 'maltreat', 'total_cases']
                 available_cols = [col for col in display_cols if col in df.columns]
                 st.dataframe(df[available_cols].head(10), use_container_width=True)
@@ -474,13 +517,13 @@ if st.session_state.df is not None:
     df = st.session_state.df
     
     # Debug section - show current dataframe structure
-    with st.expander("🔍 Current Data Structure"):
+    with st.expander("🔍 Current Data Structure (First 10 rows)"):
         st.write("**Available Columns:**")
         st.write(list(df.columns))
         st.write("**Data Types:**")
         st.write(df.dtypes)
         st.write("**Sample Records:**")
-        st.dataframe(df.head(3), use_container_width=True)
+        st.dataframe(df.head(10), use_container_width=True)
     
     st.subheader("🔍 Method Descriptions")
     
@@ -561,14 +604,20 @@ if st.session_state.df is not None:
         st.subheader("📈 Analysis Results")
         
         # Create and display visualizations
-        fig1, fig2, summary_stats = create_visualizations(
+        fig1, fig2, method_heatmaps, summary_stats = create_visualizations(
             results['monthly_rates'], 
             results['all_results']
         )
         
-        # Display charts
+        # Display main charts
         st.plotly_chart(fig1, use_container_width=True)
         st.plotly_chart(fig2, use_container_width=True)
+        
+        # Display individual method heatmaps
+        st.subheader("📊 Individual Method Analysis")
+        
+        for method, fig_heatmap in method_heatmaps.items():
+            st.plotly_chart(fig_heatmap, use_container_width=True)
         
         # Summary statistics
         st.subheader("📊 Summary Statistics")
@@ -608,68 +657,98 @@ if st.session_state.df is not None:
         tab1, tab2, tab3, tab4 = st.tabs(["Monthly Rates", "WHO Details", "Ousmane Details", "Mohamed Details"])
         
         with tab1:
-            st.write("### Monthly Reporting Rates by Method")
+            st.write("### Monthly Reporting Rates by Method (First 10 rows)")
             pivot_table = results['monthly_rates'].pivot(
                 index='year_month', 
                 columns='method', 
                 values='reporting_rate'
             ).round(2)
-            st.dataframe(pivot_table, use_container_width=True)
+            st.dataframe(pivot_table.head(10), use_container_width=True)
+            
+            # Download button for monthly rates
+            csv_monthly = io.StringIO()
+            pivot_table.to_csv(csv_monthly)
+            st.download_button(
+                label="📥 Download Monthly Rates (CSV)",
+                data=csv_monthly.getvalue(),
+                file_name=f"monthly_rates_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
         
         with tab2:
-            st.write("### WHO Method - Detailed Results")
-            st.dataframe(results['who_results'], use_container_width=True)
+            st.write("### WHO Method - Detailed Results (First 10 rows)")
+            st.dataframe(results['who_results'].head(10), use_container_width=True)
+            
+            # Download button for WHO results
+            csv_who = io.StringIO()
+            results['who_results'].to_csv(csv_who, index=False)
+            st.download_button(
+                label="📥 Download WHO Results (CSV)",
+                data=csv_who.getvalue(),
+                file_name=f"who_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
         
         with tab3:
-            st.write("### Ousmane Method - Detailed Results")
-            st.dataframe(results['ousmane_results'], use_container_width=True)
+            st.write("### Ousmane Method - Detailed Results (First 10 rows)")
+            st.dataframe(results['ousmane_results'].head(10), use_container_width=True)
+            
+            # Download button for Ousmane results
+            csv_ousmane = io.StringIO()
+            results['ousmane_results'].to_csv(csv_ousmane, index=False)
+            st.download_button(
+                label="📥 Download Ousmane Results (CSV)",
+                data=csv_ousmane.getvalue(),
+                file_name=f"ousmane_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
         
         with tab4:
-            st.write("### Mohamed Method - Detailed Results")
-            st.dataframe(results['mohamed_results'], use_container_width=True)
+            st.write("### Mohamed Method - Detailed Results (First 10 rows)")
+            st.dataframe(results['mohamed_results'].head(10), use_container_width=True)
+            
+            # Download button for Mohamed results
+            csv_mohamed = io.StringIO()
+            results['mohamed_results'].to_csv(csv_mohamed, index=False)
+            st.download_button(
+                label="📥 Download Mohamed Results (CSV)",
+                data=csv_mohamed.getvalue(),
+                file_name=f"mohamed_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
         
         # Download section
-        st.subheader("💾 Download Results")
+        st.subheader("💾 Download All Results")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # CSV download
-            csv_buffer = io.StringIO()
-            results['monthly_rates'].to_csv(csv_buffer, index=False)
-            csv_data = csv_buffer.getvalue()
+            # CSV download for all results combined
+            csv_all = io.StringIO()
+            results['all_results'].to_csv(csv_all, index=False)
             
             st.download_button(
-                label="📥 Download Monthly Rates (CSV)",
-                data=csv_data,
-                file_name=f"reporting_rates_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                label="📥 Download All Combined Results (CSV)",
+                data=csv_all.getvalue(),
+                file_name=f"all_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv"
             )
         
         with col2:
-            # Excel download with all results
-            excel_buffer = io.BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                results['monthly_rates'].to_excel(writer, sheet_name='Monthly Rates', index=False)
-                results['who_results'].to_excel(writer, sheet_name='WHO Method', index=False)
-                results['ousmane_results'].to_excel(writer, sheet_name='Ousmane Method', index=False)
-                results['mohamed_results'].to_excel(writer, sheet_name='Mohamed Method', index=False)
-                
-                # Add summary sheet
-                summary_df = results['monthly_rates'].groupby('method').agg({
-                    'reporting_rate': ['mean', 'min', 'max', 'std'],
-                    'included_in_denominator': ['mean', 'min', 'max'],
-                    'reported': ['mean', 'min', 'max']
-                }).round(2)
-                summary_df.to_excel(writer, sheet_name='Summary Statistics')
-            
-            excel_data = excel_buffer.getvalue()
+            # Summary statistics download
+            csv_summary = io.StringIO()
+            summary_df = results['monthly_rates'].groupby('method').agg({
+                'reporting_rate': ['mean', 'min', 'max', 'std'],
+                'included_in_denominator': ['mean', 'min', 'max'],
+                'reported': ['mean', 'min', 'max']
+            }).round(2)
+            summary_df.to_csv(csv_summary)
             
             st.download_button(
-                label="📥 Download All Results (Excel)",
-                data=excel_data,
-                file_name=f"reporting_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                label="📥 Download Summary Statistics (CSV)",
+                data=csv_summary.getvalue(),
+                file_name=f"summary_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
             )
 
 else:
