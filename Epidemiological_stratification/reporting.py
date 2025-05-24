@@ -90,7 +90,7 @@ if 'analysis_complete' not in st.session_state:
 
 def validate_data(df):
     """Validate that the dataframe has required columns"""
-    required_cols = ['hf_uid', 'conf']
+    required_cols = ['hf_uid', 'allout', 'susp', 'test', 'conf', 'maltreat']
     missing_cols = [col for col in required_cols if col not in df.columns]
     
     if missing_cols:
@@ -130,41 +130,50 @@ def validate_data(df):
             st.error("❌ No Date, month/year, or year_mon columns found. Please ensure your data has date information.")
             return False
     
-    # Ensure conf column is numeric
-    original_type = df['conf'].dtype
-    df['conf'] = pd.to_numeric(df['conf'], errors='coerce').fillna(0)
-    if original_type != df['conf'].dtype:
-        st.info(f"✅ Converted conf to numeric (filled NaN with 0)")
+    # Check if adm1 column exists, if not create artificial regions
+    if 'adm1' not in df.columns:
+        st.info("🔄 Creating artificial ADM1 regions for visualization...")
+        unique_hfs = df['hf_uid'].unique()
+        n_groups = min(16, max(4, len(unique_hfs) // 10))
+        
+        sorted_hfs = sorted(unique_hfs)
+        group_size = len(sorted_hfs) // n_groups + 1
+        
+        adm1_mapping = {}
+        for i, hf in enumerate(sorted_hfs):
+            group_num = i // group_size
+            adm1_mapping[hf] = f'Region_{group_num + 1:02d}'
+        
+        df['adm1'] = df['hf_uid'].map(adm1_mapping)
+        st.success(f"✅ Created {n_groups} artificial ADM1 regions")
+    
+    # Ensure numeric columns are numeric
+    numeric_cols = ['allout', 'susp', 'test', 'conf', 'maltreat']
+    for col in numeric_cols:
+        original_type = df[col].dtype
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        if original_type != df[col].dtype:
+            st.info(f"✅ Converted {col} to numeric (filled NaN with 0)")
     
     st.success(f"✅ All validation checks passed! Ready for analysis with {len(df)} records")
     return True
 
-def generate_heatmaps(df, admin_col, no_report_color='pink', report_color='lightblue', main_title='Health Facility Reporting Status by {admin_level}', legend_title='Reporting status', no_report_label='Do not report', report_label='Report'):
-    """Generate heatmaps showing reporting status by selected administrative level with customizable colors and titles"""
-    # Use only conf for reporting status
-    df['Status'] = df['conf'].apply(lambda x: 1 if x > 0 else 0).astype(int)
+def generate_heatmaps(df, no_report_color='pink', report_color='lightblue', main_title='Health Facility Reporting Status by ADM1', legend_title='Reporting status', no_report_label='Do not report', report_label='Report'):
+    """Generate heatmaps showing reporting status by ADM1 region with customizable colors and titles"""
+    # Define the specific variables we want to analyze
+    selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
     
-    # Replace {admin_level} placeholder in title
-    admin_level_name = admin_col.upper()
-    formatted_title = main_title.format(admin_level=admin_level_name)
+    df['Status'] = df[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0).astype(int)
     
     custom_cmap = ListedColormap([no_report_color, report_color])
-    admin_groups = sorted(df[admin_col].unique())
+    adm1_groups = df['adm1'].unique()
     
-    # Calculate grid dimensions - 4 columns, n rows
-    n_cols = 4
-    n_rows = (len(admin_groups) + n_cols - 1) // n_cols  # Ceiling division
-    
-    # Increase figure width for more horizontal space between plots
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(24, 5 * n_rows))
-    
-    # Handle single row case
-    if n_rows == 1:
-        axes = axes.reshape(1, -1)
+    n_rows, n_cols = 4, 4
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(20, 20))
     axes = axes.flatten()
     
-    for i, admin_region in enumerate(admin_groups):
-        subset = df[df[admin_col] == admin_region]
+    for i, adm1 in enumerate(adm1_groups):
+        subset = df[df['adm1'] == adm1]
         
         if len(subset) == 0:
             axes[i].axis('off')
@@ -191,12 +200,11 @@ def generate_heatmaps(df, admin_col, no_report_color='pink', report_color='light
             annot=False,
             ax=axes[i]
         )
-        axes[i].set_title(f'{admin_region}', fontsize=14, fontweight='bold')
+        axes[i].set_title(f'{adm1}', fontsize=14, fontweight='bold')
         axes[i].set_xlabel('Date', fontsize=10)
         axes[i].tick_params(axis='x', labelrotation=90)
     
-    # Hide unused subplots
-    for j in range(len(admin_groups), len(axes)):
+    for j in range(len(adm1_groups), len(axes)):
         axes[j].axis('off')
     
     legend_labels = [no_report_label, report_label]
@@ -214,15 +222,14 @@ def generate_heatmaps(df, admin_col, no_report_color='pink', report_color='light
         title_fontsize=14
     )
     
-    plt.suptitle(formatted_title, fontsize=18, y=0.98)
-    # Increase horizontal spacing between subplots
-    plt.tight_layout(rect=[0, 0, 1, 0.92], w_pad=3.0)
+    plt.suptitle(main_title, fontsize=18, y=0.98)
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     return fig
 
-def create_summary_stats(df, admin_col):
+def create_summary_stats(df):
     """Create summary statistics for the data"""
-    # Use only conf for reporting status
-    df['total_cases'] = df['conf']
+    selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
+    df['total_cases'] = df[selected_variables].sum(axis=1)
     df['has_reporting'] = (df['total_cases'] > 0).astype(int)
     
     # Overall statistics
@@ -232,14 +239,14 @@ def create_summary_stats(df, admin_col):
     reporting_rate = (df['has_reporting'].sum() / len(df) * 100).round(2)
     
     # Regional statistics
-    regional_stats = df.groupby(admin_col).agg({
+    regional_stats = df.groupby('adm1').agg({
         'hf_uid': 'nunique',
         'has_reporting': ['sum', 'count'],
         'total_cases': 'sum'
     }).round(2)
     
-    regional_stats.columns = ['Health_Facilities', 'Months_Reported', 'Total_Monthly_Records_Expected_To_Report', 'Total_Cases']
-    regional_stats['Reporting_Rate_%'] = (regional_stats['Months_Reported'] / regional_stats['Total_Monthly_Records_Expected_To_Report'] * 100).round(2)
+    regional_stats.columns = ['Health_Facilities', 'Months_Reported', 'Total_Months', 'Total_Cases']
+    regional_stats['Reporting_Rate_%'] = (regional_stats['Months_Reported'] / regional_stats['Total_Months'] * 100).round(2)
     
     return {
         'total_hfs': total_hfs,
@@ -255,7 +262,7 @@ st.header("📁 Data Upload")
 uploaded_file = st.file_uploader(
     "Upload your health facility data file",
     type=['csv', 'xlsx', 'xls'],
-    help="File should contain: hf_uid, conf, Date (or month/year), and administrative level columns"
+    help="File should contain: hf_uid, allout, susp, test, conf, maltreat, Date (or month/year)"
 )
 
 if uploaded_file is not None:
@@ -281,52 +288,9 @@ if uploaded_file is not None:
             st.session_state.df = df
             st.success("✅ Data validation passed!")
             
-            # Admin level selection
-            st.subheader("🗺️ Select Administrative Level")
-            
-            # Find potential admin columns
-            potential_admin_cols = [col for col in df.columns if 
-                                  any(keyword in col.lower() for keyword in ['adm', 'admin', 'region', 'district', 'province', 'state', 'county', 'zone'])]
-            
-            if not potential_admin_cols:
-                # If no obvious admin columns, show all non-required columns
-                excluded_cols = ['hf_uid', 'Date', 'conf', 'month', 'year', 'year_mon']
-                potential_admin_cols = [col for col in df.columns if col not in excluded_cols]
-            
-            if potential_admin_cols:
-                selected_admin_col = st.selectbox(
-                    "Choose administrative level for grouping:",
-                    options=potential_admin_cols,
-                    help="Select the column that represents the administrative regions for grouping health facilities"
-                )
-                st.session_state.admin_col = selected_admin_col
-                st.info(f"✅ Selected '{selected_admin_col}' as administrative grouping level")
-                
-                # Show unique values in selected admin column
-                unique_regions = df[selected_admin_col].unique()
-                st.write(f"**Found {len(unique_regions)} regions:** {', '.join(map(str, sorted(unique_regions)))}")
-                
-            else:
-                st.warning("⚠️ No administrative level columns detected. Creating default grouping...")
-                # Create artificial regions if no admin columns found
-                unique_hfs = df['hf_uid'].unique()
-                n_groups = min(16, max(4, len(unique_hfs) // 10))
-                
-                sorted_hfs = sorted(unique_hfs)
-                group_size = len(sorted_hfs) // n_groups + 1
-                
-                admin_mapping = {}
-                for i, hf in enumerate(sorted_hfs):
-                    group_num = i // group_size
-                    admin_mapping[hf] = f'Region_{group_num + 1:02d}'
-                
-                df['auto_region'] = df['hf_uid'].map(admin_mapping)
-                st.session_state.admin_col = 'auto_region'
-                st.info(f"✅ Created {n_groups} automatic regions for grouping")
-            
             # Show data summary
             st.subheader("📋 Data Summary")
-            stats = create_summary_stats(df, st.session_state.admin_col)
+            stats = create_summary_stats(df)
             
             col1, col2, col3, col4 = st.columns(4)
             with col1:
@@ -367,19 +331,65 @@ if uploaded_file is not None:
             
             # Show processed data
             with st.expander("🔍 View Processed Data (First 10 rows)"):
-                display_cols = ['hf_uid', st.session_state.admin_col, 'Date', 'conf']
+                display_cols = ['hf_uid', 'adm1', 'Date', 'allout', 'susp', 'test', 'conf', 'maltreat']
                 available_cols = [col for col in display_cols if col in df.columns]
                 st.dataframe(df[available_cols].head(10), use_container_width=True)
             
     except Exception as e:
         st.error(f"❌ Error reading file: {str(e)}")
 
-# Sample data option - REMOVED as requested
+# Sample data option
+col1, col2 = st.columns([1, 1])
+with col1:
+    if st.session_state.df is None and st.button("📊 Use Sample Data", type="secondary"):
+        # Create sample data
+        np.random.seed(42)
+        years = [2023, 2024]
+        months = list(range(1, 13))
+        hf_uids = [f'HF_{i:03d}' for i in range(1, 101)]  # 100 health facilities
+        regions = ['North', 'South', 'East', 'West', 'Central', 'Northeast', 'Northwest', 'Southeast']
+        
+        sample_data = []
+        for hf in hf_uids:
+            # Assign each HF to a region
+            region = np.random.choice(regions)
+            
+            for year in years:
+                for month in months:
+                    # Simulate different reporting patterns
+                    if np.random.random() > 0.3:  # 70% chance of reporting
+                        allout = np.random.poisson(5)
+                        susp = np.random.poisson(3)
+                        test = np.random.poisson(4)
+                        conf = np.random.poisson(2)
+                        maltreat = np.random.poisson(2)
+                    else:
+                        allout = susp = test = conf = maltreat = 0
+                    
+                    date_str = f"{year}-{month:02d}"
+                    
+                    sample_data.append({
+                        'hf_uid': hf,
+                        'adm1': region,
+                        'Date': date_str,
+                        'allout': allout,
+                        'susp': susp,
+                        'test': test,
+                        'conf': conf,
+                        'maltreat': maltreat
+                    })
+        
+        df = pd.DataFrame(sample_data)
+        
+        # Validate and process the sample data
+        if validate_data(df):
+            st.session_state.df = df
+            st.success("✅ Sample data loaded!")
+            st.rerun()
 
 # Main analysis section
-if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
+if st.session_state.df is not None:
     df = st.session_state.df
-    admin_col = st.session_state.admin_col
     
     # Analysis button
     st.subheader("🎨 Customize Your Analysis")
@@ -396,9 +406,7 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
     
     with col2:
         st.markdown("**📝 Text Customization**")
-        admin_level_name = admin_col.upper()
-        default_title = f"Health Facility Reporting Status by {admin_level_name}"
-        main_title = st.text_input("Main Title", default_title, help="Title for the entire heatmap")
+        main_title = st.text_input("Main Title", "Health Facility Reporting Status by ADM1", help="Title for the entire heatmap")
         legend_title = st.text_input("Legend Title", "Reporting status", help="Title for the legend")
     
     col3, col4 = st.columns(2)
@@ -483,7 +491,6 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 # Generate heatmap with custom parameters
                 fig = generate_heatmaps(
                     df, 
-                    admin_col,
                     no_report_color=no_report_color,
                     report_color=report_color,
                     main_title=main_title,
@@ -493,7 +500,7 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 )
                 
                 # Generate statistics
-                stats = create_summary_stats(df, admin_col)
+                stats = create_summary_stats(df)
                 
                 st.session_state.analysis_complete = True
                 st.session_state.heatmap_fig = fig
@@ -530,7 +537,7 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
             """, unsafe_allow_html=True)
         
         # Show heatmap
-        st.write(f"### 🗺️ Interactive {admin_col.upper()} Reporting Status Heatmap")
+        st.write("### 🗺️ Interactive Regional Reporting Status Heatmap")
         st.pyplot(st.session_state.heatmap_fig)
         
         # Quick regeneration options
@@ -542,12 +549,9 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 st.session_state.quick_regen = {
                     'no_report_color': '#FFC0CB',
                     'report_color': '#ADD8E6',
-                    'main_title': f'Health Facility Reporting Status by {admin_col.upper()}',
+                    'main_title': 'Health Facility Reporting Status by ADM1',
                     'legend_title': 'Reporting status',
                     'no_report_label': 'Do not report',
-                    'report_label': 'Report'
-                }
-                st.rerun()',
                     'report_label': 'Report'
                 }
                 st.rerun()
@@ -557,7 +561,7 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 st.session_state.quick_regen = {
                     'no_report_color': '#FF6B6B',
                     'report_color': '#4ECDC4',
-                    'main_title': f'Facility Reporting Heat Map by {admin_col.upper()}',
+                    'main_title': 'Facility Reporting Heat Map',
                     'legend_title': 'Status',
                     'no_report_label': 'No Activity',
                     'report_label': 'Active'
@@ -569,7 +573,7 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 st.session_state.quick_regen = {
                     'no_report_color': '#E8F4FD',
                     'report_color': '#1E3A8A',
-                    'main_title': f'Reporting Ocean: Facility Status Depths by {admin_col.upper()}',
+                    'main_title': 'Reporting Ocean: Facility Status Depths',
                     'legend_title': 'Activity Level',
                     'no_report_label': 'Shallow',
                     'report_label': 'Deep'
@@ -581,7 +585,7 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 st.session_state.quick_regen = {
                     'no_report_color': '#FFF8DC',
                     'report_color': '#D2691E',
-                    'main_title': f'Autumn Reporting Landscape by {admin_col.upper()}',
+                    'main_title': 'Autumn Reporting Landscape',
                     'legend_title': 'Harvest Status',
                     'no_report_label': 'Dormant',
                     'report_label': 'Harvesting'
@@ -594,7 +598,6 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 settings = st.session_state.quick_regen
                 fig = generate_heatmaps(
                     df,
-                    admin_col,
                     no_report_color=settings['no_report_color'],
                     report_color=settings['report_color'],
                     main_title=settings['main_title'],
@@ -615,7 +618,7 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
                 st.snow()
         
         # Show detailed statistics
-        st.write(f"### 📊 {admin_col.upper()} Statistics")
+        st.write("### 📊 Regional Statistics")
         st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
         
         # Download section
@@ -626,7 +629,8 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
         with col1:
             # Full dataset download
             df_with_status = df.copy()
-            df_with_status['Status'] = df_with_status['conf'].apply(lambda x: 1 if x > 0 else 0)
+            selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
+            df_with_status['Status'] = df_with_status[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
             
             csv_full = io.StringIO()
             df_with_status.to_csv(csv_full, index=False)
@@ -644,9 +648,9 @@ if st.session_state.df is not None and hasattr(st.session_state, 'admin_col'):
             st.session_state.stats['regional_stats'].to_csv(csv_regional)
             
             st.download_button(
-                label=f"📥 Download {admin_col.upper()} Stats (CSV)",
+                label="📥 Download Regional Stats (CSV)",
                 data=csv_regional.getvalue(),
-                file_name=f"{admin_col}_statistics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                file_name=f"regional_statistics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv"
             )
         
