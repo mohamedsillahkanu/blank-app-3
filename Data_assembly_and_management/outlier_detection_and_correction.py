@@ -1095,10 +1095,10 @@ if st.session_state.df is None:
         
         st.markdown("""
         **💾 Smart Export:**
-        - Direct CSV downloads only
+        - Direct CSV download only
         - Corrected dataset export
-        - Comprehensive outlier analysis
-        - Outlier bounds and correction status
+        - Optimized for performance
+        - Memory-efficient processing
         """)
 
 # Footer with memory info
