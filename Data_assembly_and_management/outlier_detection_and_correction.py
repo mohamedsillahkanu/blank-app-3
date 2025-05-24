@@ -320,6 +320,109 @@ def winsorize_data(data, limits=(0.25, 0.25)):
     
     return corrected
 
+def create_simple_outlier_analysis(original_df, corrected_df, outlier_results, groupby_cols):
+    """Create simplified outlier analysis without complex processing"""
+    # Start with original dataframe
+    analysis_df = original_df.copy()
+    
+    # Add corrected columns for each analyzed variable
+    for column, results in outlier_results.items():
+        method = results['method'].lower()
+        
+        # Add corrected values
+        analysis_df[f'allout_{method}'] = corrected_df[column]
+        
+        # Create outlier status and bounds columns
+        outlier_status = []
+        lower_bounds = []
+        upper_bounds = []
+        
+        if 'group_results' in results and groupby_cols:
+            # Group-based processing (simplified)
+            for idx, row in analysis_df.iterrows():
+                try:
+                    # Find group for this row
+                    if len(groupby_cols) == 1:
+                        group_value = row[groupby_cols[0]]
+                        group_key = str(group_value)
+                    else:
+                        group_values = [row[col] for col in groupby_cols]
+                        group_key = str(tuple(group_values))
+                    
+                    # Get group bounds if available
+                    if group_key in results['group_results']:
+                        # Calculate bounds for this group quickly
+                        group_mask = True
+                        for i, col in enumerate(groupby_cols):
+                            if len(groupby_cols) == 1:
+                                group_mask &= (original_df[col] == group_value)
+                            else:
+                                group_mask &= (original_df[col] == group_values[i])
+                        
+                        group_data = original_df.loc[group_mask, column].dropna()
+                        if len(group_data) >= 3:
+                            Q1 = group_data.quantile(0.25)
+                            Q3 = group_data.quantile(0.75)
+                            IQR = Q3 - Q1
+                            lower_bound = Q1 - 1.5 * IQR
+                            upper_bound = Q3 + 1.5 * IQR
+                            
+                            original_value = row[column]
+                            if pd.notna(original_value):
+                                is_outlier = (original_value < lower_bound) or (original_value > upper_bound)
+                                outlier_status.append('Outlier' if is_outlier else 'Non-Outlier')
+                            else:
+                                outlier_status.append('Non-Outlier')
+                            
+                            lower_bounds.append(lower_bound)
+                            upper_bounds.append(upper_bound)
+                        else:
+                            outlier_status.append('Non-Outlier')
+                            lower_bounds.append(None)
+                            upper_bounds.append(None)
+                    else:
+                        outlier_status.append('Non-Outlier')
+                        lower_bounds.append(None)
+                        upper_bounds.append(None)
+                        
+                except Exception:
+                    outlier_status.append('Non-Outlier')
+                    lower_bounds.append(None)
+                    upper_bounds.append(None)
+        else:
+            # Overall analysis (no grouping)
+            data = original_df[column].dropna()
+            if len(data) >= 3:
+                Q1 = data.quantile(0.25)
+                Q3 = data.quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                for idx, row in analysis_df.iterrows():
+                    original_value = row[column]
+                    if pd.notna(original_value):
+                        is_outlier = (original_value < lower_bound) or (original_value > upper_bound)
+                        outlier_status.append('Outlier' if is_outlier else 'Non-Outlier')
+                    else:
+                        outlier_status.append('Non-Outlier')
+                    
+                    lower_bounds.append(lower_bound)
+                    upper_bounds.append(upper_bound)
+            else:
+                # Not enough data
+                for idx, row in analysis_df.iterrows():
+                    outlier_status.append('Non-Outlier')
+                    lower_bounds.append(None)
+                    upper_bounds.append(None)
+        
+        # Add analysis columns
+        analysis_df[f'allout_{method}_category'] = outlier_status
+        analysis_df[f'allout_{method}_lower_bound'] = lower_bounds
+        analysis_df[f'allout_{method}_upper_bound'] = upper_bounds
+    
+    return analysis_df
+
 def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_method, **kwargs):
     """Apply outlier correction within groups with memory optimization"""
     corrected_df = df.copy()
@@ -925,6 +1028,270 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
     st.markdown("**Preview (first 5 rows):**")
     st.dataframe(st.session_state.corrected_df.head(), use_container_width=True, height=200)
     
+    # Visualization section
+    st.markdown("### 📊 Outlier Visualization")
+    
+    if len(st.session_state.outlier_results) > 0:
+        # Get available columns and groups
+        available_columns = list(st.session_state.outlier_results.keys())
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            viz_column = st.selectbox(
+                "Select column to visualize:",
+                available_columns,
+                help="Choose which numeric column to visualize"
+            )
+        
+        with col2:
+            viz_type = st.selectbox(
+                "Visualization type:",
+                ["Box Plot", "Scatter Plot"],
+                help="Choose visualization type"
+            )
+        
+        with col3:
+            # Get grouping options
+            if st.session_state.groupby_columns:
+                viz_group = st.selectbox(
+                    "Group by (optional):",
+                    ["None"] + st.session_state.groupby_columns,
+                    help="Choose grouping for visualization"
+                )
+                viz_group = None if viz_group == "None" else viz_group
+            else:
+                viz_group = None
+                st.info("No grouping variables available")
+        
+        if st.button("🎨 Generate Visualization", type="secondary"):
+            with st.spinner("Creating visualization..."):
+                try:
+                    # Get original and corrected data
+                    original_data = st.session_state.original_df[viz_column].dropna()
+                    corrected_data = st.session_state.corrected_df[viz_column].dropna()
+                    
+                    # Detect outliers for visualization
+                    if viz_group and viz_group in st.session_state.original_df.columns:
+                        # Group-based outlier detection for visualization
+                        outlier_mask = pd.Series(False, index=st.session_state.original_df.index)
+                        bounds_data = []
+                        
+                        for group_name, group_data in st.session_state.original_df.groupby(viz_group):
+                            group_series = group_data[viz_column].dropna()
+                            if len(group_series) >= 3:
+                                outliers, lower_bound, upper_bound = detect_outliers_iqr(group_series, 1.5)
+                                outlier_mask.loc[group_series.index] = outliers
+                                bounds_data.append({
+                                    'group': group_name,
+                                    'lower_bound': lower_bound,
+                                    'upper_bound': upper_bound
+                                })
+                    else:
+                        # Overall outlier detection
+                        outliers, lower_bound, upper_bound = detect_outliers_iqr(original_data, 1.5)
+                        outlier_mask = outliers
+                        bounds_data = [{'group': 'All Data', 'lower_bound': lower_bound, 'upper_bound': upper_bound}]
+                    
+                    # Create visualization dataframes
+                    viz_df_original = pd.DataFrame({
+                        'Value': original_data,
+                        'Outlier': ['Outlier' if outlier_mask.loc[idx] else 'Normal' for idx in original_data.index],
+                        'Index': range(len(original_data))
+                    })
+                    
+                    viz_df_corrected = pd.DataFrame({
+                        'Value': corrected_data,
+                        'Outlier': 'Corrected',
+                        'Index': range(len(corrected_data))
+                    })
+                    
+                    if viz_group:
+                        viz_df_original['Group'] = [st.session_state.original_df.loc[idx, viz_group] for idx in original_data.index]
+                        viz_df_corrected['Group'] = [st.session_state.corrected_df.loc[idx, viz_group] for idx in corrected_data.index]
+                    
+                    # Create subplots
+                    fig = make_subplots(
+                        rows=1, cols=2,
+                        subplot_titles=["Original Data (Outliers Detected)", "Corrected Data"],
+                        horizontal_spacing=0.1
+                    )
+                    
+                    if viz_type == "Box Plot":
+                        if viz_group:
+                            # Grouped box plots
+                            for group in viz_df_original['Group'].unique():
+                                group_data_orig = viz_df_original[viz_df_original['Group'] == group]
+                                group_data_corr = viz_df_corrected[viz_df_corrected['Group'] == group]
+                                
+                                # Original data boxplot
+                                fig.add_trace(
+                                    go.Box(
+                                        y=group_data_orig['Value'],
+                                        name=f'{group}',
+                                        boxpoints='all',
+                                        jitter=0.3,
+                                        pointpos=-1.8,
+                                        marker=dict(
+                                            color=['red' if x == 'Outlier' else 'blue' for x in group_data_orig['Outlier']]
+                                        ),
+                                        showlegend=False
+                                    ),
+                                    row=1, col=1
+                                )
+                                
+                                # Corrected data boxplot
+                                fig.add_trace(
+                                    go.Box(
+                                        y=group_data_corr['Value'],
+                                        name=f'{group}',
+                                        boxpoints='all',
+                                        jitter=0.3,
+                                        pointpos=-1.8,
+                                        marker=dict(color='green'),
+                                        showlegend=False
+                                    ),
+                                    row=1, col=2
+                                )
+                        else:
+                            # Single box plot
+                            fig.add_trace(
+                                go.Box(
+                                    y=viz_df_original['Value'],
+                                    name='Original',
+                                    boxpoints='all',
+                                    jitter=0.3,
+                                    pointpos=-1.8,
+                                    marker=dict(
+                                        color=['red' if x == 'Outlier' else 'blue' for x in viz_df_original['Outlier']]
+                                    ),
+                                    showlegend=False
+                                ),
+                                row=1, col=1
+                            )
+                            
+                            fig.add_trace(
+                                go.Box(
+                                    y=viz_df_corrected['Value'],
+                                    name='Corrected',
+                                    boxpoints='all',
+                                    jitter=0.3,
+                                    pointpos=-1.8,
+                                    marker=dict(color='green'),
+                                    showlegend=False
+                                ),
+                                row=1, col=2
+                            )
+                    
+                    else:  # Scatter Plot
+                        # Original data scatter
+                        outlier_data = viz_df_original[viz_df_original['Outlier'] == 'Outlier']
+                        normal_data = viz_df_original[viz_df_original['Outlier'] == 'Normal']
+                        
+                        fig.add_trace(
+                            go.Scatter(
+                                x=normal_data['Index'],
+                                y=normal_data['Value'],
+                                mode='markers',
+                                name='Normal',
+                                marker=dict(color='blue', size=6),
+                                showlegend=True
+                            ),
+                            row=1, col=1
+                        )
+                        
+                        fig.add_trace(
+                            go.Scatter(
+                                x=outlier_data['Index'],
+                                y=outlier_data['Value'],
+                                mode='markers',
+                                name='Outliers',
+                                marker=dict(color='red', size=8),
+                                showlegend=True
+                            ),
+                            row=1, col=1
+                        )
+                        
+                        # Corrected data scatter
+                        fig.add_trace(
+                            go.Scatter(
+                                x=viz_df_corrected['Index'],
+                                y=viz_df_corrected['Value'],
+                                mode='markers',
+                                name='Corrected',
+                                marker=dict(color='green', size=6),
+                                showlegend=True
+                            ),
+                            row=1, col=2
+                        )
+                        
+                        # Add bound lines for scatter plots
+                        for bound_info in bounds_data:
+                            # Upper bound line (original)
+                            fig.add_hline(
+                                y=bound_info['upper_bound'],
+                                line_dash="dot",
+                                line_color="red",
+                                annotation_text=f"Upper Bound: {bound_info['upper_bound']:.2f}",
+                                annotation_position="top right",
+                                col=1
+                            )
+                            
+                            # Lower bound line (original)
+                            fig.add_hline(
+                                y=bound_info['lower_bound'],
+                                line_dash="dot",
+                                line_color="red",
+                                annotation_text=f"Lower Bound: {bound_info['lower_bound']:.2f}",
+                                annotation_position="bottom right",
+                                col=1
+                            )
+                    
+                    # Update layout
+                    fig.update_layout(
+                        title=f"Outlier Detection and Correction: {viz_column}",
+                        height=500,
+                        showlegend=True,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1
+                        )
+                    )
+                    
+                    fig.update_xaxes(title_text="Data Points" if viz_type == "Scatter Plot" else "Groups", row=1, col=1)
+                    fig.update_xaxes(title_text="Data Points" if viz_type == "Scatter Plot" else "Groups", row=1, col=2)
+                    fig.update_yaxes(title_text=viz_column, row=1, col=1)
+                    fig.update_yaxes(title_text=viz_column, row=1, col=2)
+                    
+                    # Display the plot
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Summary information
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        outlier_count = sum(outlier_mask)
+                        st.metric("Outliers Detected", f"{outlier_count}")
+                    with col2:
+                        outlier_percentage = (outlier_count / len(original_data)) * 100
+                        st.metric("Outlier Rate", f"{outlier_percentage:.2f}%")
+                    with col3:
+                        correction_method = st.session_state.outlier_results[viz_column]['method']
+                        st.metric("Correction Method", correction_method)
+                    
+                    # Show bounds information
+                    if len(bounds_data) == 1:
+                        bound_info = bounds_data[0]
+                        st.info(f"🎯 **Detection Bounds:** Lower = {bound_info['lower_bound']:.3f}, Upper = {bound_info['upper_bound']:.3f}")
+                    else:
+                        st.info(f"🎯 **Group-based bounds:** {len(bounds_data)} different groups with individual bounds")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error creating visualization: {str(e)}")
+    else:
+        st.info("💡 Run outlier detection first to enable visualization")
     # Download section
     st.markdown("### 💾 Download Results")
     
