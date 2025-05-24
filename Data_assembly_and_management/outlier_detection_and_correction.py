@@ -197,7 +197,7 @@ def display_dataframe_head(df, title="Data Preview", height=300):
     st.markdown(f'<div class="memory-info">📊 Total rows: {len(df):,} | Memory usage: {get_memory_usage(df)}</div>', unsafe_allow_html=True)
     
     # Display only first 5 rows
-    display_df = df.head(5)
+    display_df = df.head()
     st.dataframe(display_df, use_container_width=True, height=height)
     
     if len(df) > 5:
@@ -308,8 +308,8 @@ def correct_outliers_moving_average(data, outliers, window=5):
     corrected[outliers] = moving_avg[outliers]
     return corrected
 
-def winsorize_data(data, limits=(0.05, 0.05)):
-    """Apply Winsorization to the data"""
+def winsorize_data(data, limits=(0.25, 0.25)):
+    """Apply Winsorization to the data - caps at 25th and 75th percentiles"""
     from scipy.stats import mstats
     corrected = data.copy()
     non_null_mask = ~data.isna()
@@ -349,7 +349,7 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
                 elif correction_method == "Moving Average":
                     corrected_series = correct_outliers_moving_average(group_series, outliers, kwargs.get('window', 5))
                 elif correction_method == "Winsorization":
-                    corrected_series = winsorize_data(group_series, kwargs.get('limits', (0.05, 0.05)))
+                    corrected_series = winsorize_data(group_series, kwargs.get('limits', (0.25, 0.25)))
                 
                 # Update the corrected dataframe
                 corrected_df.loc[group_data.index, numeric_col] = corrected_series
@@ -384,7 +384,7 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
             elif correction_method == "Moving Average":
                 corrected_data = correct_outliers_moving_average(data, outliers, kwargs.get('window', 5))
             elif correction_method == "Winsorization":
-                corrected_data = winsorize_data(data, kwargs.get('limits', (0.05, 0.05)))
+                corrected_data = winsorize_data(data, kwargs.get('limits', (0.25, 0.25)))
             
             corrected_df[numeric_col] = corrected_data
             
@@ -402,81 +402,91 @@ def apply_group_based_correction(df, groupby_cols, numeric_cols, correction_meth
 
 @st.cache_data
 def create_outlier_analysis_df(original_df, corrected_df, outlier_results, groupby_cols):
-    """Create comprehensive outlier analysis dataframe for export"""
-    analysis_rows = []
+    """Create comprehensive outlier analysis dataframe for export - matches your format"""
+    # Create a copy of original dataframe to add analysis columns
+    analysis_df = original_df.copy()
     
+    # Add analysis columns for each numeric column that was corrected
     for column, results in outlier_results.items():
+        method = results['method']
+        
+        # Add the corrected values column
+        analysis_df[f'allout_{method.lower()}'] = corrected_df[column]
+        
         if 'group_results' in results:
             # Group-based analysis
-            for group_name, group_result in results['group_results'].items():
-                # Get group data
-                if len(groupby_cols) == 1:
-                    group_mask = original_df[groupby_cols[0]] == group_name
-                else:
-                    # Handle multiple groupby columns
-                    group_mask = True
-                    for i, col in enumerate(groupby_cols):
-                        if isinstance(group_name, tuple):
-                            group_mask &= (original_df[col] == group_name[i])
-                        else:
-                            group_mask &= (original_df[col] == group_name)
-                
-                group_data = original_df[group_mask][column]
-                
-                # Calculate bounds for this group
-                outliers, lower_bound, upper_bound = detect_outliers_iqr(group_data, 1.5)
-                
-                # Add row for each data point in this group
-                for idx in group_data.index:
-                    original_value = original_df.loc[idx, column]
-                    corrected_value = corrected_df.loc[idx, column]
-                    is_outlier = outliers.loc[idx] if idx in outliers.index else False
-                    
-                    # Create group identifier
+            outlier_category = []
+            lower_bounds = []
+            upper_bounds = []
+            corrected_status = []
+            
+            for idx in analysis_df.index:
+                # Find which group this row belongs to
+                group_found = False
+                for group_name, group_result in results['group_results'].items():
+                    # Get group data
                     if len(groupby_cols) == 1:
-                        group_id = f"{groupby_cols[0]}={group_name}"
-                    else:
-                        group_parts = [f"{col}={val}" for col, val in zip(groupby_cols, group_name)]
-                        group_id = "; ".join(group_parts)
+                        group_mask = original_df[groupby_cols[0]] == group_name
+                    elif len(groupby_cols) > 1:
+                        group_mask = True
+                        if isinstance(group_name, str):
+                            group_mask = original_df[groupby_cols[0]] == group_name
+                        else:
+                            for i, col in enumerate(groupby_cols):
+                                if i < len(group_name):
+                                    group_mask &= (original_df[col] == group_name[i])
                     
-                    analysis_rows.append({
-                        'Row_Index': idx,
-                        'Column': column,
-                        'Group': group_id,
-                        'Original_Value': original_value,
-                        'Corrected_Value': corrected_value,
-                        'Lower_Bound': lower_bound,
-                        'Upper_Bound': upper_bound,
-                        'Outlier_Status': 'Outlier' if is_outlier else 'Normal',
-                        f'Corrected_{results["method"]}': 'Yes' if is_outlier else 'No',
-                        'Detection_Method': 'IQR',
-                        'Correction_Method': results['method']
-                    })
+                    if idx in original_df[group_mask].index:
+                        group_data = original_df[group_mask][column].dropna()
+                        if len(group_data) > 0:
+                            # Calculate bounds for this group
+                            outliers, lower_bound, upper_bound = detect_outliers_iqr(group_data, 1.5)
+                            
+                            # Check if this specific row is an outlier
+                            original_value = original_df.loc[idx, column]
+                            is_outlier = (idx in outliers.index and outliers.loc[idx]) if not pd.isna(original_value) else False
+                            
+                            outlier_category.append('Outlier' if is_outlier else 'Non-Outlier')
+                            lower_bounds.append(lower_bound)
+                            upper_bounds.append(upper_bound)
+                            corrected_status.append(corrected_df.loc[idx, column])
+                            group_found = True
+                            break
+                
+                if not group_found:
+                    outlier_category.append('Non-Outlier')
+                    lower_bounds.append(None)
+                    upper_bounds.append(None)
+                    corrected_status.append(corrected_df.loc[idx, column])
+            
+            # Add columns to analysis dataframe
+            analysis_df[f'allout_{method.lower()}_category'] = outlier_category
+            analysis_df[f'allout_{method.lower()}_lower_bound'] = lower_bounds
+            analysis_df[f'allout_{method.lower()}_upper_bound'] = upper_bounds
+            analysis_df[f'allout_{method.lower()}_{method.lower()}_su'] = corrected_status
+            
         else:
             # Overall analysis (no grouping)
-            data = original_df[column]
+            data = original_df[column].dropna()
             outliers, lower_bound, upper_bound = detect_outliers_iqr(data, 1.5)
             
-            for idx in data.index:
+            # Create categories for all rows
+            outlier_categories = []
+            corrected_status = []
+            
+            for idx in analysis_df.index:
                 original_value = original_df.loc[idx, column]
-                corrected_value = corrected_df.loc[idx, column]
-                is_outlier = outliers.loc[idx] if idx in outliers.index else False
+                is_outlier = (idx in outliers.index and outliers.loc[idx]) if not pd.isna(original_value) else False
                 
-                analysis_rows.append({
-                    'Row_Index': idx,
-                    'Column': column,
-                    'Group': 'All_Data',
-                    'Original_Value': original_value,
-                    'Corrected_Value': corrected_value,
-                    'Lower_Bound': lower_bound,
-                    'Upper_Bound': upper_bound,
-                    'Outlier_Status': 'Outlier' if is_outlier else 'Normal',
-                    f'Corrected_{results["method"]}': 'Yes' if is_outlier else 'No',
-                    'Detection_Method': 'IQR',
-                    'Correction_Method': results['method']
-                })
+                outlier_categories.append('Outlier' if is_outlier else 'Non-Outlier')
+                corrected_status.append(corrected_df.loc[idx, column])
+            
+            analysis_df[f'allout_{method.lower()}_category'] = outlier_categories
+            analysis_df[f'allout_{method.lower()}_lower_bound'] = lower_bound
+            analysis_df[f'allout_{method.lower()}_upper_bound'] = upper_bound
+            analysis_df[f'allout_{method.lower()}_{method.lower()}_su'] = corrected_status
     
-    return pd.DataFrame(analysis_rows)
+    return analysis_df
     """Apply outlier correction within groups with memory optimization"""
     corrected_df = df.copy()
     results = {}
@@ -753,6 +763,7 @@ if st.session_state.df is not None:
                 )
                 
                 st.markdown(f"**Detection rule:** Values outside Q1 - {iqr_multiplier}×IQR to Q3 + {iqr_multiplier}×IQR")
+                st.info(f"🎯 **Current IQR threshold:** {iqr_multiplier} (higher values = fewer outliers detected)")
             
             with col2:
                 st.markdown("### Correction Method")
@@ -774,25 +785,8 @@ if st.session_state.df is not None:
                     )
                 
                 elif correction_method == "Winsorization":
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        lower_percentile = st.slider(
-                            "Lower limit (%)",
-                            min_value=1.0,
-                            max_value=25.0,
-                            value=5.0,
-                            step=0.5,
-                            help="Values below this percentile will be capped"
-                        )
-                    with col_b:
-                        upper_percentile = st.slider(
-                            "Upper limit (%)",
-                            min_value=75.0,
-                            max_value=99.0,
-                            value=95.0,
-                            step=0.5,
-                            help="Values above this percentile will be capped"
-                        )
+                    st.markdown("**Fixed percentiles:** 25th and 75th percentiles")
+                    st.info("Winsorization will cap values at Q1 (25th percentile) and Q3 (75th percentile)")
             
             # Show method descriptions
             st.markdown("### 📋 Method Descriptions")
@@ -801,7 +795,7 @@ if st.session_state.df is not None:
                 "Mean": "Replace outliers with the mean value of the group/dataset",
                 "Median": "Replace outliers with the median value of the group/dataset", 
                 "Moving Average": "Replace outliers with the moving average of surrounding values",
-                "Winsorization": "Cap extreme values at specified percentiles"
+                "Winsorization": "Cap extreme values at 25th and 75th percentiles (Q1 and Q3)"
             }
             
             badges = {
@@ -828,7 +822,7 @@ if st.session_state.df is not None:
                         if correction_method == "Moving Average":
                             kwargs['window'] = window_size
                         elif correction_method == "Winsorization":
-                            kwargs['limits'] = (lower_percentile/100, (100-upper_percentile)/100)
+                            kwargs['limits'] = (0.25, 0.25)  # Fixed at 25th and 75th percentiles
                         
                         # Store groupby columns for outlier analysis
                         st.session_state.groupby_columns = groupby_columns
@@ -871,7 +865,8 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
         correction_method = list(st.session_state.outlier_results.values())[0]['method']
         st.metric("Correction Method", correction_method)
     
-    # Detailed results summary only
+    # Detailed results summary with grouping statistics for first numeric column only
+    first_column = True
     for column, results in st.session_state.outlier_results.items():
         st.markdown(f"#### Results for {column}")
         
@@ -886,6 +881,26 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
                 📊 Groups analyzed: {len(results['group_results']):,}
             </div>
             """, unsafe_allow_html=True)
+            
+            # Show grouping statistics only for the first numeric column
+            if first_column:
+                group_data = []
+                for group_name, group_result in list(results['group_results'].items())[:5]:
+                    group_data.append({
+                        'Group': group_name,
+                        'Group Size': group_result['group_size'],
+                        'Outliers Found': group_result['outlier_count'],
+                        'Outlier Rate (%)': f"{group_result['outlier_percentage']:.2f}"
+                    })
+                
+                if group_data:
+                    group_df = pd.DataFrame(group_data)
+                    st.markdown("**Top 5 Groups Statistics:**")
+                    st.dataframe(group_df.head(), use_container_width=True, height=200)
+                    
+                    if len(results['group_results']) > 5:
+                        st.info(f"💡 Showing 5 of {len(results['group_results']):,} total groups")
+                        
         else:
             # Overall results summary
             st.markdown(f"""
@@ -898,6 +913,7 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
             </div>
             """, unsafe_allow_html=True)
         
+        first_column = False
         st.markdown("---")
     
     # Display corrected dataframe summary only
@@ -905,8 +921,9 @@ if st.session_state.correction_applied and st.session_state.corrected_df is not 
     st.markdown(f"📊 **Dataset shape:** {st.session_state.corrected_df.shape[0]:,} rows × {st.session_state.corrected_df.shape[1]} columns")
     st.markdown(f"💾 **Memory usage:** {get_memory_usage(st.session_state.corrected_df)}")
     
-    # Show only first 5 rows
-    display_dataframe_head(st.session_state.corrected_df, "Corrected Dataset Preview", height=300)
+    # Show only first 5 rows (head only)
+    st.markdown("**Preview (first 5 rows):**")
+    st.dataframe(st.session_state.corrected_df.head(), use_container_width=True, height=200)
     
     # Download section
     st.markdown("### 💾 Download Results")
