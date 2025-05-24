@@ -343,57 +343,6 @@ if uploaded_file is not None:
 if st.session_state.df is not None:
     df = st.session_state.df
     
-    # Analysis button
-    st.subheader("🎨 Customize Your Analysis")
-    
-    # Interactive customization options
-    st.write("### 🎯 Visualization Settings")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**🎨 Color Customization**")
-        no_report_color = st.color_picker("No Report Color", "#FFC0CB", help="Color for facilities that don't report")
-        report_color = st.color_picker("Report Color", "#ADD8E6", help="Color for facilities that do report")
-    
-    with col2:
-        st.markdown("**📝 Text Customization**")
-        main_title = st.text_input("Main Title", "Health Facility Reporting Status by ADM1", help="Title for the entire heatmap")
-        legend_title = st.text_input("Legend Title", "Reporting status", help="Title for the legend")
-    
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        no_report_label = st.text_input("No Report Label", "Do not report", help="Label for non-reporting facilities")
-    
-    with col4:
-        report_label = st.text_input("Report Label", "Report", help="Label for reporting facilities")
-    
-    # Color preview
-    st.write("### 🎨 Color Preview")
-    col_prev1, col_prev2, col_prev3 = st.columns(3)
-    
-    with col_prev1:
-        st.markdown(f"""
-        <div style="background-color: {no_report_color}; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0;">
-            <strong>{no_report_label}</strong>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_prev2:
-        st.markdown(f"""
-        <div style="background-color: #f0f0f0; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0; border: 2px dashed #ccc;">
-            <strong>VS</strong>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_prev3:
-        st.markdown(f"""
-        <div style="background-color: {report_color}; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0;">
-            <strong>{report_label}</strong>
-        </div>
-        """, unsafe_allow_html=True)
-    
     st.write("### 📊 Analysis Options")
     
     col1, col2, col3 = st.columns(3)
