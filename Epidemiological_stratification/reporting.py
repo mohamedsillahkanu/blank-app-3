@@ -549,7 +549,7 @@ if st.session_state.df is not None:
                 st.session_state.quick_regen = {
                     'no_report_color': '#FFC0CB',
                     'report_color': '#ADD8E6',
-                    'main_title': 'Health Facility Reporting Status by ADM1',
+                    'main_title': 'Health Facility Reporting Status by district',
                     'legend_title': 'Reporting status',
                     'no_report_label': 'Do not report',
                     'report_label': 'Report'
@@ -561,10 +561,10 @@ if st.session_state.df is not None:
                 st.session_state.quick_regen = {
                     'no_report_color': '#FF6B6B',
                     'report_color': '#4ECDC4',
-                    'main_title': 'Facility Reporting Heat Map',
+                    'main_title': 'Health Facility Reporting Status by district',
                     'legend_title': 'Status',
-                    'no_report_label': 'No Activity',
-                    'report_label': 'Active'
+                    'no_report_label': 'Do not report',
+                    'report_label': 'Report'
                 }
                 st.rerun()
         
@@ -573,10 +573,10 @@ if st.session_state.df is not None:
                 st.session_state.quick_regen = {
                     'no_report_color': '#E8F4FD',
                     'report_color': '#1E3A8A',
-                    'main_title': 'Reporting Ocean: Facility Status Depths',
+                    'main_title': 'Health Facility Reporting Status by adm1',
                     'legend_title': 'Activity Level',
-                    'no_report_label': 'Shallow',
-                    'report_label': 'Deep'
+                    'no_report_label': 'Do not report',
+                    'report_label': 'Report'
                 }
                 st.rerun()
         
@@ -585,10 +585,10 @@ if st.session_state.df is not None:
                 st.session_state.quick_regen = {
                     'no_report_color': '#FFF8DC',
                     'report_color': '#D2691E',
-                    'main_title': 'Autumn Reporting Landscape',
+                    'main_title': 'Health Facility Reporting Status by district',
                     'legend_title': 'Harvest Status',
-                    'no_report_label': 'Dormant',
-                    'report_label': 'Harvesting'
+                    'no_report_label': 'Do not report',
+                    'report_label': 'Report'
                 }
                 st.rerun()
         
@@ -617,65 +617,6 @@ if st.session_state.df is not None:
                 st.balloons()
                 st.snow()
         
-        # Show detailed statistics
-        st.write("### 📊 Regional Statistics")
-        st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
-        
-        # Download section
-        st.subheader("💾 Download Results")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            # Full dataset download
-            df_with_status = df.copy()
-            selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
-            df_with_status['Status'] = df_with_status[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
-            
-            csv_full = io.StringIO()
-            df_with_status.to_csv(csv_full, index=False)
-            
-            st.download_button(
-                label="📥 Download Full Dataset (CSV)",
-                data=csv_full.getvalue(),
-                file_name=f"full_dataset_with_status_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with col2:
-            # Regional statistics download
-            csv_regional = io.StringIO()
-            st.session_state.stats['regional_stats'].to_csv(csv_regional)
-            
-            st.download_button(
-                label="📥 Download Regional Stats (CSV)",
-                data=csv_regional.getvalue(),
-                file_name=f"regional_statistics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with col3:
-            # Summary report download
-            summary_data = {
-                'Metric': ['Total Health Facilities', 'Total Time Periods', 'Total Records', 'Overall Reporting Rate (%)'],
-                'Value': [
-                    st.session_state.stats['total_hfs'],
-                    st.session_state.stats['total_months'],
-                    st.session_state.stats['total_records'],
-                    st.session_state.stats['overall_reporting_rate']
-                ]
-            }
-            summary_df = pd.DataFrame(summary_data)
-            
-            csv_summary = io.StringIO()
-            summary_df.to_csv(csv_summary, index=False)
-            
-            st.download_button(
-                label="📥 Download Summary Report (CSV)",
-                data=csv_summary.getvalue(),
-                file_name=f"summary_report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
 
 else:
     # When no data is uploaded, show nothing or minimal message
