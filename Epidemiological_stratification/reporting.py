@@ -562,7 +562,7 @@ if st.session_state.df is not None:
                     'no_report_color': '#FF6B6B',
                     'report_color': '#4ECDC4',
                     'main_title': 'Health Facility Reporting Status by district',
-                    'legend_title': 'Status',
+                    'legend_title': 'Reporting status',
                     'no_report_label': 'Do not report',
                     'report_label': 'Report'
                 }
@@ -574,7 +574,7 @@ if st.session_state.df is not None:
                     'no_report_color': '#E8F4FD',
                     'report_color': '#1E3A8A',
                     'main_title': 'Health Facility Reporting Status by adm1',
-                    'legend_title': 'Activity Level',
+                    'legend_title': 'Reporting status',
                     'no_report_label': 'Do not report',
                     'report_label': 'Report'
                 }
@@ -586,7 +586,7 @@ if st.session_state.df is not None:
                     'no_report_color': '#FFF8DC',
                     'report_color': '#D2691E',
                     'main_title': 'Health Facility Reporting Status by district',
-                    'legend_title': 'Harvest Status',
+                    'legend_title': 'Reporting status',
                     'no_report_label': 'Do not report',
                     'report_label': 'Report'
                 }
