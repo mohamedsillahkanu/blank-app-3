@@ -203,21 +203,31 @@ def display_dataframe_head(df, title="Data Preview", height=300):
     if len(df) > 5:
         st.info(f"💡 Showing 5 of {len(df):,} total rows to optimize performance")
 
-    # Store groupby columns in session state for outlier analysis
-    if 'groupby_columns' not in st.session_state:
-        st.session_state.groupby_columns = []
-    # Initialize session state with memory optimization
-    if 'df' not in st.session_state:
-    if 'original_df' not in st.session_state:
-        st.session_state.original_df = None
-    if 'corrected_df' not in st.session_state:
-        st.session_state.corrected_df = None
-    if 'outlier_results' not in st.session_state:
-        st.session_state.outlier_results = {}
-    if 'correction_applied' not in st.session_state:
-        st.session_state.correction_applied = False
-    if 'memory_optimized' not in st.session_state:
-        st.session_state.memory_optimized = False
+# Store groupby columns in session state for outlier analysis
+if 'groupby_columns' not in st.session_state:
+    st.session_state.groupby_columns = []
+# Initialize session state with memory optimization
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'original_df' not in st.session_state:
+    st.session_state.original_df = None
+if 'corrected_df' not in st.session_state:
+    st.session_state.corrected_df = None
+if 'outlier_results' not in st.session_state:
+    st.session_state.outlier_results = {}
+if 'correction_applied' not in st.session_state:
+    st.session_state.correction_applied = False
+if 'memory_optimized' not in st.session_state:
+    st.session_state.memory_optimized = False
+    st.session_state.original_df = None
+if 'corrected_df' not in st.session_state:
+    st.session_state.corrected_df = None
+if 'outlier_results' not in st.session_state:
+    st.session_state.outlier_results = {}
+if 'correction_applied' not in st.session_state:
+    st.session_state.correction_applied = False
+if 'memory_optimized' not in st.session_state:
+    st.session_state.memory_optimized = False
 
 @st.cache_data
 def read_file(uploaded_file):
