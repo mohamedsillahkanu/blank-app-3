@@ -2,14 +2,15 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
-from datetime import datetime, timedelta
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+from datetime import datetime
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
 
 # Set page config
 st.set_page_config(
-    page_title="Reporting Rate Analysis Tool",
+    page_title="Health Facility Reporting Analysis",
     page_icon="📊",
     layout="wide"
 )
@@ -61,14 +62,23 @@ st.markdown("""
         border: 1px solid #bbdefb;
         margin: 1rem 0;
     }
+    
+    .feature-highlight {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        text-align: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>📊 Health Facility Reporting Rate Analysis</h1>
-    <p>Advanced reporting rate calculation using WHO, Ousmane, and Mohamed methods</p>
+    <h1>📊 Health Facility Reporting Status Analysis</h1>
+    <p>Advanced heatmap visualization for health facility reporting patterns by region</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -77,356 +87,182 @@ if 'df' not in st.session_state:
     st.session_state.df = None
 if 'analysis_complete' not in st.session_state:
     st.session_state.analysis_complete = False
-if 'results' not in st.session_state:
-    st.session_state.results = {}
 
 def validate_data(df):
     """Validate that the dataframe has required columns"""
-    required_cols = ['hf_uid', 'month', 'year', 'allout', 'susp', 'test', 'conf', 'maltreat']
+    required_cols = ['hf_uid', 'allout', 'susp', 'test', 'conf', 'maltreat']
     missing_cols = [col for col in required_cols if col not in df.columns]
     
     if missing_cols:
         st.error(f"Missing required columns: {', '.join(missing_cols)}")
         return False
     
-    # Create year_month and date columns from month and year
-    try:
-        st.info("🔄 Creating year_mon and date columns from month and year...")
-        
-        # Ensure month and year are numeric
-        df['month'] = pd.to_numeric(df['month'], errors='coerce')
-        df['year'] = pd.to_numeric(df['year'], errors='coerce')
-        
-        # Check for invalid values
-        if df['month'].isna().any() or df['year'].isna().any():
-            st.error("❌ Invalid values found in month or year columns")
-            return False
-        
-        if (df['month'] < 1).any() or (df['month'] > 12).any():
-            st.error("❌ Month values must be between 1 and 12")
-            return False
-        
-        # Create year_mon in YYYY-MM format
-        df['year_mon'] = df['year'].astype(int).astype(str) + '-' + df['month'].astype(int).astype(str).str.zfill(2)
-        
-        # Create date column in YYYY-MM format
-        df['date'] = pd.to_datetime(df['year_mon'], format='%Y-%m')
-        
-        st.success("✅ Successfully created year_mon and date columns from month and year")
+    # Check if Date column exists, if not try to create it
+    if 'Date' not in df.columns:
+        if 'month' in df.columns and 'year' in df.columns:
+            try:
+                st.info("🔄 Creating Date column from month and year...")
+                df['month'] = pd.to_numeric(df['month'], errors='coerce')
+                df['year'] = pd.to_numeric(df['year'], errors='coerce')
                 
-    except Exception as e:
-        st.error(f"❌ Error creating date columns from month and year: {str(e)}")
-        return False
+                if df['month'].isna().any() or df['year'].isna().any():
+                    st.error("❌ Invalid values found in month or year columns")
+                    return False
+                
+                if (df['month'] < 1).any() or (df['month'] > 12).any():
+                    st.error("❌ Month values must be between 1 and 12")
+                    return False
+                
+                df['Date'] = df['year'].astype(int).astype(str) + '-' + df['month'].astype(int).astype(str).str.zfill(2)
+                st.success("✅ Successfully created Date column from month and year")
+            except Exception as e:
+                st.error(f"❌ Error creating Date column: {str(e)}")
+                return False
+        elif 'year_mon' in df.columns:
+            try:
+                st.info("🔄 Using year_mon as Date column...")
+                df['Date'] = df['year_mon'].astype(str)
+                st.success("✅ Successfully used year_mon as Date column")
+            except Exception as e:
+                st.error(f"❌ Error using year_mon as Date: {str(e)}")
+                return False
+        else:
+            st.error("❌ No Date, month/year, or year_mon columns found. Please ensure your data has date information.")
+            return False
     
-    # Use hf_uid directly (no need for hf_id)
-    st.info("✅ Using hf_uid for health facility identification")
-    
-    # Rename maltreat to treat for consistency with existing code
-    df['treat'] = df['maltreat']
-    st.info("✅ Mapped maltreat to treat for analysis")
+    # Check if adm1 column exists, if not create artificial regions
+    if 'adm1' not in df.columns:
+        st.info("🔄 Creating artificial ADM1 regions for visualization...")
+        unique_hfs = df['hf_uid'].unique()
+        n_groups = min(16, max(4, len(unique_hfs) // 10))
+        
+        sorted_hfs = sorted(unique_hfs)
+        group_size = len(sorted_hfs) // n_groups + 1
+        
+        adm1_mapping = {}
+        for i, hf in enumerate(sorted_hfs):
+            group_num = i // group_size
+            adm1_mapping[hf] = f'Region_{group_num + 1:02d}'
+        
+        df['adm1'] = df['hf_uid'].map(adm1_mapping)
+        st.success(f"✅ Created {n_groups} artificial ADM1 regions")
     
     # Ensure numeric columns are numeric
-    numeric_cols = ['allout', 'susp', 'test', 'conf', 'treat']
+    numeric_cols = ['allout', 'susp', 'test', 'conf', 'maltreat']
     for col in numeric_cols:
         original_type = df[col].dtype
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         if original_type != df[col].dtype:
             st.info(f"✅ Converted {col} to numeric (filled NaN with 0)")
     
-    st.success(f"✅ All validation checks passed! Date column created with {len(df)} records")
+    st.success(f"✅ All validation checks passed! Ready for analysis with {len(df)} records")
     return True
 
-def calculate_total_cases(df):
-    """Calculate total cases and determine if reporting"""
-    df['total_cases'] = df['allout'] + df['susp'] + df['test'] + df['conf'] + df['treat']
-    df['is_reporting'] = df['total_cases'] > 0
-    return df
-
-def method_who(df):
-    """
-    WHO Method: HF becomes active from first date when total > 0,
-    and remains in denominator for all subsequent months
-    """
-    results = []
+def generate_heatmaps(df, no_report_color='pink', report_color='lightblue', main_title='Health Facility Reporting Status by ADM1', legend_title='Reporting status', no_report_label='Do not report', report_label='Report'):
+    """Generate heatmaps showing reporting status by ADM1 region with customizable colors and titles"""
+    # Define the specific variables we want to analyze
+    selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
     
-    # Get unique health facilities
-    hf_list = df['hf_uid'].unique()
+    df['Status'] = df[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0).astype(int)
     
-    # Get all unique months in the dataset
-    df['year_month'] = df['date'].dt.to_period('M')
-    all_months = sorted(df['year_month'].unique())
+    custom_cmap = ListedColormap([no_report_color, report_color])
+    adm1_groups = df['adm1'].unique()
     
-    for hf in hf_list:
-        hf_data = df[df['hf_uid'] == hf].copy()
-        hf_data = hf_data.sort_values('date')
+    n_rows, n_cols = 4, 4
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(20, 20))
+    axes = axes.flatten()
+    
+    for i, adm1 in enumerate(adm1_groups):
+        subset = df[df['adm1'] == adm1]
         
-        # Find first active date (when total > 0)
-        active_records = hf_data[hf_data['total_cases'] > 0]
+        if len(subset) == 0:
+            axes[i].axis('off')
+            continue
         
-        if len(active_records) > 0:
-            first_active_date = active_records.iloc[0]['date']
-            first_active_month = active_records.iloc[0]['year_month']
-            
-            # For each month from first active onwards
-            for month in all_months:
-                if month >= first_active_month:
-                    # Check if HF reported in this month
-                    month_data = hf_data[hf_data['year_month'] == month]
-                    
-                    if len(month_data) > 0:
-                        reported = month_data['is_reporting'].any()
-                    else:
-                        reported = False
-                    
-                    results.append({
-                        'hf_uid': hf,
-                        'year_month': month,
-                        'method': 'WHO',
-                        'included_in_denominator': True,
-                        'reported': reported,
-                        'first_active_date': first_active_date
-                    })
-    
-    return pd.DataFrame(results)
-
-def method_ousmane(df):
-    """
-    Ousmane Method: HF is inactive if it doesn't report for 6 consecutive months
-    including current month
-    """
-    results = []
-    
-    # Get unique health facilities
-    hf_list = df['hf_uid'].unique()
-    
-    # Get all unique months in the dataset
-    df['year_month'] = df['date'].dt.to_period('M')
-    all_months = sorted(df['year_month'].unique())
-    
-    for hf in hf_list:
-        hf_data = df[df['hf_uid'] == hf].copy()
-        hf_data = hf_data.sort_values('date')
+        hf_order = subset.groupby('hf_uid')['Status'].sum().sort_values(ascending=False).index
+        subset = subset.copy()
+        subset['hf_uid'] = pd.Categorical(subset['hf_uid'], categories=hf_order, ordered=True)
+        subset = subset.sort_values('hf_uid')
         
-        # Create a complete month series for this HF
-        hf_months = {}
-        for month in all_months:
-            month_data = hf_data[hf_data['year_month'] == month]
-            if len(month_data) > 0:
-                hf_months[month] = month_data['is_reporting'].any()
-            else:
-                hf_months[month] = False
+        heatmap_data = subset.pivot(index='hf_uid', columns='Date', values='Status')
+        heatmap_data.fillna(0, inplace=True)
         
-        # Check each month for 6 consecutive non-reporting periods
-        for i, month in enumerate(all_months):
-            # Look at current month and previous 5 months (total 6 months)
-            if i >= 5:  # Need at least 6 months of data
-                last_6_months = all_months[i-5:i+1]
-                reporting_status = [hf_months.get(m, False) for m in last_6_months]
-                
-                # If all 6 months show no reporting, HF is inactive
-                if not any(reporting_status):
-                    included = False
-                else:
-                    included = True
-                
-                reported = hf_months.get(month, False)
-                
-                results.append({
-                    'hf_uid': hf,
-                    'year_month': month,
-                    'method': 'Ousmane',
-                    'included_in_denominator': included,
-                    'reported': reported,
-                    'consecutive_non_reporting': not any(reporting_status)
-                })
-            else:
-                # For first 5 months, include all HFs
-                reported = hf_months.get(month, False)
-                results.append({
-                    'hf_uid': hf,
-                    'year_month': month,
-                    'method': 'Ousmane',
-                    'included_in_denominator': True,
-                    'reported': reported,
-                    'consecutive_non_reporting': False
-                })
-    
-    return pd.DataFrame(results)
-
-def method_mohamed(df):
-    """
-    Mohamed Method: Exclude HFs with <25% reporting rate since first report,
-    then include from first report onwards
-    """
-    results = []
-    
-    # Get unique health facilities
-    hf_list = df['hf_uid'].unique()
-    
-    # Get all unique months in the dataset
-    df['year_month'] = df['date'].dt.to_period('M')
-    all_months = sorted(df['year_month'].unique())
-    max_date = df['date'].max()
-    
-    for hf in hf_list:
-        hf_data = df[df['hf_uid'] == hf].copy()
-        hf_data = hf_data.sort_values('date')
+        if heatmap_data.empty:
+            axes[i].axis('off')
+            continue
         
-        # Find first reporting date
-        reporting_records = hf_data[hf_data['is_reporting'] == True]
-        
-        if len(reporting_records) > 0:
-            first_report_date = reporting_records.iloc[0]['date']
-            first_report_month = reporting_records.iloc[0]['year_month']
-            
-            # Calculate reporting rate from first report to max date
-            months_since_first = []
-            reports_since_first = []
-            
-            for month in all_months:
-                if month >= first_report_month:
-                    months_since_first.append(month)
-                    month_data = hf_data[hf_data['year_month'] == month]
-                    if len(month_data) > 0:
-                        reports_since_first.append(month_data['is_reporting'].any())
-                    else:
-                        reports_since_first.append(False)
-            
-            # Calculate overall reporting rate
-            if len(months_since_first) > 0:
-                reporting_rate = sum(reports_since_first) / len(months_since_first)
-                include_hf = reporting_rate >= 0.25
-            else:
-                include_hf = False
-            
-            # If HF qualifies, include from first report onwards
-            if include_hf:
-                for month in all_months:
-                    if month >= first_report_month:
-                        month_data = hf_data[hf_data['year_month'] == month]
-                        
-                        if len(month_data) > 0:
-                            reported = month_data['is_reporting'].any()
-                        else:
-                            reported = False
-                        
-                        results.append({
-                            'hf_uid': hf,
-                            'year_month': month,
-                            'method': 'Mohamed',
-                            'included_in_denominator': True,
-                            'reported': reported,
-                            'overall_reporting_rate': reporting_rate,
-                            'first_report_date': first_report_date
-                        })
+        sns.heatmap(
+            heatmap_data,
+            cmap=custom_cmap,
+            linewidths=0,
+            cbar=False,
+            yticklabels=len(heatmap_data) <= 20,  # Show labels only if not too many
+            annot=False,
+            ax=axes[i]
+        )
+        axes[i].set_title(f'{adm1}', fontsize=14, fontweight='bold')
+        axes[i].set_xlabel('Date', fontsize=10)
+        axes[i].tick_params(axis='x', labelrotation=90)
     
-    return pd.DataFrame(results)
-
-def calculate_reporting_rates(method_results):
-    """Calculate monthly reporting rates for each method"""
-    monthly_rates = method_results.groupby(['method', 'year_month']).agg({
-        'included_in_denominator': 'sum',
-        'reported': 'sum'
-    }).reset_index()
+    for j in range(len(adm1_groups), len(axes)):
+        axes[j].axis('off')
     
-    monthly_rates['reporting_rate'] = (monthly_rates['reported'] / 
-                                     monthly_rates['included_in_denominator'] * 100).round(2)
+    legend_labels = [no_report_label, report_label]
+    legend_colors = [custom_cmap(0), custom_cmap(1)]
+    legend_patches = [Patch(color=color, label=label) 
+                     for color, label in zip(legend_colors, legend_labels)]
     
-    return monthly_rates
-
-def create_visualizations(monthly_rates, method_results):
-    """Create visualizations for the reporting rates"""
-    
-    # Convert period to string for plotting
-    monthly_rates['month_str'] = monthly_rates['year_month'].astype(str)
-    
-    # 1. Line chart comparing all three methods
-    fig1 = px.line(monthly_rates, 
-                   x='month_str', 
-                   y='reporting_rate', 
-                   color='method',
-                   title='Reporting Rates Comparison: WHO vs Ousmane vs Mohamed Methods',
-                   labels={'month_str': 'Month', 'reporting_rate': 'Reporting Rate (%)'})
-    
-    fig1.update_layout(
-        xaxis_tickangle=45,
-        height=500,
-        showlegend=True
+    fig.legend(
+        handles=legend_patches,
+        loc='upper center',
+        bbox_to_anchor=(0.5, 0.95),
+        ncol=2,
+        title=legend_title,
+        fontsize=12,
+        title_fontsize=14
     )
     
-    # 2. Bar chart showing denominators
-    fig2 = px.bar(monthly_rates, 
-                  x='month_str', 
-                  y='included_in_denominator', 
-                  color='method',
-                  title='Number of Health Facilities in Denominator by Method',
-                  labels={'month_str': 'Month', 'included_in_denominator': 'Number of HFs'},
-                  barmode='group')
+    plt.suptitle(main_title, fontsize=18, y=0.98)
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
+    return fig
+
+def create_summary_stats(df):
+    """Create summary statistics for the data"""
+    selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
+    df['total_cases'] = df[selected_variables].sum(axis=1)
+    df['has_reporting'] = (df['total_cases'] > 0).astype(int)
     
-    fig2.update_layout(
-        xaxis_tickangle=45,
-        height=500
-    )
+    # Overall statistics
+    total_hfs = df['hf_uid'].nunique()
+    total_months = df['Date'].nunique()
+    total_records = len(df)
+    reporting_rate = (df['has_reporting'].sum() / len(df) * 100).round(2)
     
-    # 3. Individual heatmaps for each method showing reporting status by HF and month
-    method_heatmaps = {}
-    for method in ['WHO', 'Ousmane', 'Mohamed']:
-        method_data = method_results[method_results['method'] == method].copy()
-        if len(method_data) > 0:
-            # Convert year_month to string for proper ordering
-            method_data['month_str'] = method_data['year_month'].astype(str)
-            
-            # Create pivot table for heatmap
-            pivot_data = method_data.pivot_table(
-                index='hf_uid', 
-                columns='month_str', 
-                values='reported', 
-                fill_value=0
-            )
-            
-            # Create heatmap
-            fig_heatmap = px.imshow(
-                pivot_data.values,
-                x=pivot_data.columns,
-                y=pivot_data.index,
-                color_continuous_scale='viridis',
-                title=f'{method} Method: Reporting Status by Health Facility and Month',
-                labels={'x': 'Date (YYYY-MM)', 'y': 'Health Facility UID', 'color': 'Reported'},
-                aspect='auto'
-            )
-            
-            fig_heatmap.update_layout(
-                height=max(400, len(pivot_data) * 20),  # Adjust height based on number of HFs
-                xaxis_tickangle=45
-            )
-            
-            # Update colorbar
-            fig_heatmap.update_coloraxes(
-                colorbar_title="Reporting Status",
-                colorbar=dict(
-                    tickvals=[0, 1],
-                    ticktext=['Not Reported', 'Reported']
-                )
-            )
-            
-            method_heatmaps[method] = fig_heatmap
-    
-    # 4. Summary statistics table
-    summary_stats = monthly_rates.groupby('method').agg({
-        'reporting_rate': ['mean', 'min', 'max', 'std'],
-        'included_in_denominator': ['mean', 'min', 'max'],
-        'reported': 'mean'
+    # Regional statistics
+    regional_stats = df.groupby('adm1').agg({
+        'hf_uid': 'nunique',
+        'has_reporting': ['sum', 'count'],
+        'total_cases': 'sum'
     }).round(2)
     
-    return fig1, fig2, method_heatmaps, summary_stats
+    regional_stats.columns = ['Health_Facilities', 'Months_Reported', 'Total_Months', 'Total_Cases']
+    regional_stats['Reporting_Rate_%'] = (regional_stats['Months_Reported'] / regional_stats['Total_Months'] * 100).round(2)
+    
+    return {
+        'total_hfs': total_hfs,
+        'total_months': total_months,
+        'total_records': total_records,
+        'overall_reporting_rate': reporting_rate,
+        'regional_stats': regional_stats
+    }
 
-# File upload section (in main area, not sidebar)
+# File upload section
 st.header("📁 Data Upload")
 
 uploaded_file = st.file_uploader(
-    "Upload your data file",
+    "Upload your health facility data file",
     type=['csv', 'xlsx', 'xls'],
-    help="File should contain: hf_uid, month, year, allout, susp, test, conf, maltreat"
+    help="File should contain: hf_uid, allout, susp, test, conf, maltreat, Date (or month/year)"
 )
 
 if uploaded_file is not None:
@@ -449,19 +285,53 @@ if uploaded_file is not None:
         
         # Validate data
         if validate_data(df):
-            df = calculate_total_cases(df)
             st.session_state.df = df
             st.success("✅ Data validation passed!")
             
             # Show data summary
             st.subheader("📋 Data Summary")
-            st.write(f"**Date range:** {df['date'].min().date()} to {df['date'].max().date()}")
-            st.write(f"**Health facilities:** {df['hf_uid'].nunique()}")
-            st.write(f"**Total records:** {len(df)}")
+            stats = create_summary_stats(df)
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h4>Health Facilities</h4>
+                    <h2>{stats['total_hfs']}</h2>
+                    <p>Unique facilities</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h4>Time Periods</h4>
+                    <h2>{stats['total_months']}</h2>
+                    <p>Unique months</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h4>Total Records</h4>
+                    <h2>{stats['total_records']:,}</h2>
+                    <p>Data points</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h4>Reporting Rate</h4>
+                    <h2>{stats['overall_reporting_rate']}%</h2>
+                    <p>Overall rate</p>
+                </div>
+                """, unsafe_allow_html=True)
             
             # Show processed data
             with st.expander("🔍 View Processed Data (First 10 rows)"):
-                display_cols = ['hf_uid', 'month', 'year', 'year_mon', 'date', 'allout', 'susp', 'test', 'conf', 'maltreat', 'total_cases']
+                display_cols = ['hf_uid', 'adm1', 'Date', 'allout', 'susp', 'test', 'conf', 'maltreat']
                 available_cols = [col for col in display_cols if col in df.columns]
                 st.dataframe(df[available_cols].head(10), use_container_width=True)
             
@@ -472,14 +342,18 @@ if uploaded_file is not None:
 col1, col2 = st.columns([1, 1])
 with col1:
     if st.session_state.df is None and st.button("📊 Use Sample Data", type="secondary"):
-        # Create sample data with month and year columns
+        # Create sample data
         np.random.seed(42)
         years = [2023, 2024]
-        months = list(range(1, 13))  # 1-12
-        hf_uids = [f'HF_{i:03d}' for i in range(1, 51)]  # 50 health facilities
+        months = list(range(1, 13))
+        hf_uids = [f'HF_{i:03d}' for i in range(1, 101)]  # 100 health facilities
+        regions = ['North', 'South', 'East', 'West', 'Central', 'Northeast', 'Northwest', 'Southeast']
         
         sample_data = []
         for hf in hf_uids:
+            # Assign each HF to a region
+            region = np.random.choice(regions)
+            
             for year in years:
                 for month in months:
                     # Simulate different reporting patterns
@@ -492,10 +366,12 @@ with col1:
                     else:
                         allout = susp = test = conf = maltreat = 0
                     
+                    date_str = f"{year}-{month:02d}"
+                    
                     sample_data.append({
                         'hf_uid': hf,
-                        'month': month,
-                        'year': year,
+                        'adm1': region,
+                        'Date': date_str,
                         'allout': allout,
                         'susp': susp,
                         'test': test,
@@ -507,37 +383,78 @@ with col1:
         
         # Validate and process the sample data
         if validate_data(df):
-            df = calculate_total_cases(df)
             st.session_state.df = df
             st.success("✅ Sample data loaded!")
             st.rerun()
 
-# Main content
+# Main analysis section
 if st.session_state.df is not None:
     df = st.session_state.df
     
-    # Debug section - show current dataframe structure
-    with st.expander("🔍 Current Data Structure (First 10 rows)"):
-        st.write("**Available Columns:**")
-        st.write(list(df.columns))
-        st.write("**Data Types:**")
-        st.write(df.dtypes)
-        st.write("**Sample Records:**")
-        st.dataframe(df.head(10), use_container_width=True)
+    # Analysis button
+    st.subheader("🎨 Customize Your Analysis")
     
-    st.subheader("🔍 Method Descriptions")
+    # Interactive customization options
+    st.write("### 🎯 Visualization Settings")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**🎨 Color Customization**")
+        no_report_color = st.color_picker("No Report Color", "#FFC0CB", help="Color for facilities that don't report")
+        report_color = st.color_picker("Report Color", "#ADD8E6", help="Color for facilities that do report")
+    
+    with col2:
+        st.markdown("**📝 Text Customization**")
+        main_title = st.text_input("Main Title", "Health Facility Reporting Status by ADM1", help="Title for the entire heatmap")
+        legend_title = st.text_input("Legend Title", "Reporting status", help="Title for the legend")
+    
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        no_report_label = st.text_input("No Report Label", "Do not report", help="Label for non-reporting facilities")
+    
+    with col4:
+        report_label = st.text_input("Report Label", "Report", help="Label for reporting facilities")
+    
+    # Color preview
+    st.write("### 🎨 Color Preview")
+    col_prev1, col_prev2, col_prev3 = st.columns(3)
+    
+    with col_prev1:
+        st.markdown(f"""
+        <div style="background-color: {no_report_color}; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0;">
+            <strong>{no_report_label}</strong>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_prev2:
+        st.markdown(f"""
+        <div style="background-color: #f0f0f0; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0; border: 2px dashed #ccc;">
+            <strong>VS</strong>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_prev3:
+        st.markdown(f"""
+        <div style="background-color: {report_color}; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0;">
+            <strong>{report_label}</strong>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.write("### 📊 Analysis Options")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("""
         <div class="method-card">
-            <h4>🟢 WHO Method</h4>
-            <p>Health facility becomes active from the first date when total cases > 0 and remains in denominator for all subsequent months.</p>
+            <h4>🗺️ Regional Heatmap</h4>
+            <p>Visualize reporting patterns across different administrative regions with an intuitive heatmap display.</p>
             <ul>
-                <li>Include from first reporting onwards</li>
-                <li>Never exclude once active</li>
-                <li>Conservative approach</li>
+                <li>Pink: No reporting</li>
+                <li>Light Blue: Reporting</li>
+                <li>Organized by region</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -545,12 +462,12 @@ if st.session_state.df is not None:
     with col2:
         st.markdown("""
         <div class="method-card">
-            <h4>🟡 Ousmane Method</h4>
-            <p>Health facility is excluded if it doesn't report for 6 consecutive months including the current month.</p>
+            <h4>📊 Summary Statistics</h4>
+            <p>Comprehensive statistical analysis of reporting patterns by region and time period.</p>
             <ul>
-                <li>6-month sliding window</li>
-                <li>Dynamic inclusion/exclusion</li>
-                <li>Responsive to inactivity</li>
+                <li>Regional reporting rates</li>
+                <li>Facility counts</li>
+                <li>Temporal patterns</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -558,196 +475,205 @@ if st.session_state.df is not None:
     with col3:
         st.markdown("""
         <div class="method-card">
-            <h4>🔵 Mohamed Method</h4>
-            <p>Exclude health facilities with <25% reporting rate since first report, then include active ones from first report onwards.</p>
+            <h4>💾 Data Export</h4>
+            <p>Download processed data and analysis results in CSV format for further analysis.</p>
             <ul>
-                <li>Quality-based filtering</li>
-                <li>Overall performance assessment</li>
-                <li>Minimum 25% threshold</li>
+                <li>Full dataset with status</li>
+                <li>Regional summaries</li>
+                <li>Analysis results</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
     
-    # Analysis button
-    if st.button("🚀 Run Analysis", type="primary"):
-        with st.spinner("Analyzing reporting rates using all three methods..."):
-            
-            # Run all three methods
-            who_results = method_who(df)
-            ousmane_results = method_ousmane(df)
-            mohamed_results = method_mohamed(df)
-            
-            # Combine results
-            all_results = pd.concat([who_results, ousmane_results, mohamed_results], 
-                                  ignore_index=True)
-            
-            # Calculate monthly reporting rates
-            monthly_rates = calculate_reporting_rates(all_results)
-            
-            # Store results
-            st.session_state.results = {
-                'all_results': all_results,
-                'monthly_rates': monthly_rates,
-                'who_results': who_results,
-                'ousmane_results': ousmane_results,
-                'mohamed_results': mohamed_results
-            }
-            st.session_state.analysis_complete = True
+    if st.button("🚀 Generate Customized Analysis", type="primary"):
+        with st.spinner("Generating your customized reporting analysis..."):
+            try:
+                # Generate heatmap with custom parameters
+                fig = generate_heatmaps(
+                    df, 
+                    no_report_color=no_report_color,
+                    report_color=report_color,
+                    main_title=main_title,
+                    legend_title=legend_title,
+                    no_report_label=no_report_label,
+                    report_label=report_label
+                )
+                
+                # Generate statistics
+                stats = create_summary_stats(df)
+                
+                st.session_state.analysis_complete = True
+                st.session_state.heatmap_fig = fig
+                st.session_state.stats = stats
+                st.session_state.custom_settings = {
+                    'no_report_color': no_report_color,
+                    'report_color': report_color,
+                    'main_title': main_title,
+                    'legend_title': legend_title,
+                    'no_report_label': no_report_label,
+                    'report_label': report_label
+                }
+                
+            except Exception as e:
+                st.error(f"Error generating analysis: {str(e)}")
         
-        st.success("✅ Analysis completed!")
+        st.success("✅ Customized analysis completed!")
         st.rerun()
     
     # Show results if analysis is complete
-    if st.session_state.analysis_complete and st.session_state.results:
-        results = st.session_state.results
+    if st.session_state.analysis_complete:
+        st.subheader("📈 Your Customized Analysis Results")
         
-        st.subheader("📈 Analysis Results")
+        # Show current settings
+        if hasattr(st.session_state, 'custom_settings'):
+            settings = st.session_state.custom_settings
+            st.markdown(f"""
+            <div class="feature-highlight">
+                <h4>🎨 Current Visualization Settings</h4>
+                <p><strong>Title:</strong> {settings['main_title']}</p>
+                <p><strong>Legend:</strong> {settings['legend_title']}</p>
+                <p><strong>Labels:</strong> {settings['no_report_label']} vs {settings['report_label']}</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Create and display visualizations
-        fig1, fig2, method_heatmaps, summary_stats = create_visualizations(
-            results['monthly_rates'], 
-            results['all_results']
-        )
+        # Show heatmap
+        st.write("### 🗺️ Interactive Regional Reporting Status Heatmap")
+        st.pyplot(st.session_state.heatmap_fig)
         
-        # Display main charts
-        st.plotly_chart(fig1, use_container_width=True)
-        st.plotly_chart(fig2, use_container_width=True)
+        # Quick regeneration options
+        st.write("### 🔄 Quick Style Changes")
+        quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
         
-        # Display individual method heatmaps
-        st.subheader("📊 Individual Method Analysis")
+        with quick_col1:
+            if st.button("🌸 Classic Pink/Blue", help="Traditional pink and light blue colors"):
+                st.session_state.quick_regen = {
+                    'no_report_color': '#FFC0CB',
+                    'report_color': '#ADD8E6',
+                    'main_title': 'Health Facility Reporting Status by ADM1',
+                    'legend_title': 'Reporting status',
+                    'no_report_label': 'Do not report',
+                    'report_label': 'Report'
+                }
+                st.rerun()
         
-        for method, fig_heatmap in method_heatmaps.items():
-            st.plotly_chart(fig_heatmap, use_container_width=True)
+        with quick_col2:
+            if st.button("🔥 Heat Colors", help="Red for no report, green for report"):
+                st.session_state.quick_regen = {
+                    'no_report_color': '#FF6B6B',
+                    'report_color': '#4ECDC4',
+                    'main_title': 'Facility Reporting Heat Map',
+                    'legend_title': 'Status',
+                    'no_report_label': 'No Activity',
+                    'report_label': 'Active'
+                }
+                st.rerun()
         
-        # Summary statistics
-        st.subheader("📊 Summary Statistics")
+        with quick_col3:
+            if st.button("🌊 Ocean Theme", help="Deep blue theme"):
+                st.session_state.quick_regen = {
+                    'no_report_color': '#E8F4FD',
+                    'report_color': '#1E3A8A',
+                    'main_title': 'Reporting Ocean: Facility Status Depths',
+                    'legend_title': 'Activity Level',
+                    'no_report_label': 'Shallow',
+                    'report_label': 'Deep'
+                }
+                st.rerun()
+        
+        with quick_col4:
+            if st.button("🍂 Autumn Theme", help="Warm autumn colors"):
+                st.session_state.quick_regen = {
+                    'no_report_color': '#FFF8DC',
+                    'report_color': '#D2691E',
+                    'main_title': 'Autumn Reporting Landscape',
+                    'legend_title': 'Harvest Status',
+                    'no_report_label': 'Dormant',
+                    'report_label': 'Harvesting'
+                }
+                st.rerun()
+        
+        # Handle quick regeneration
+        if hasattr(st.session_state, 'quick_regen'):
+            with st.spinner("Applying new theme..."):
+                settings = st.session_state.quick_regen
+                fig = generate_heatmaps(
+                    df,
+                    no_report_color=settings['no_report_color'],
+                    report_color=settings['report_color'],
+                    main_title=settings['main_title'],
+                    legend_title=settings['legend_title'],
+                    no_report_label=settings['no_report_label'],
+                    report_label=settings['report_label']
+                )
+                st.session_state.heatmap_fig = fig
+                st.session_state.custom_settings = settings
+                del st.session_state.quick_regen
+                st.rerun()
+        
+        # Add celebration button
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            if st.button("🎉 Celebrate Results!", type="secondary"):
+                st.balloons()
+                st.snow()
+        
+        # Show detailed statistics
+        st.write("### 📊 Regional Statistics")
+        st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
+        
+        # Download section
+        st.subheader("💾 Download Results")
         
         col1, col2, col3 = st.columns(3)
         
-        # Calculate overall stats for each method
-        method_stats = results['monthly_rates'].groupby('method').agg({
-            'reporting_rate': 'mean',
-            'included_in_denominator': 'mean',
-            'reported': 'mean'
-        }).round(2)
-        
-        methods = ['WHO', 'Ousmane', 'Mohamed']
-        colors = ['#4CAF50', '#FF9800', '#2196F3']
-        
-        for i, method in enumerate(methods):
-            with [col1, col2, col3][i]:
-                if method in method_stats.index:
-                    avg_rate = method_stats.loc[method, 'reporting_rate']
-                    avg_denom = method_stats.loc[method, 'included_in_denominator']
-                    avg_reported = method_stats.loc[method, 'reported']
-                    
-                    st.markdown(f"""
-                    <div class="metric-card" style="border-top-color: {colors[i]};">
-                        <h4>{method} Method</h4>
-                        <h2>{avg_rate:.1f}%</h2>
-                        <p>Average Reporting Rate</p>
-                        <small>Avg Denominator: {avg_denom:.0f} HFs<br>
-                        Avg Reporting: {avg_reported:.0f} HFs</small>
-                    </div>
-                    """, unsafe_allow_html=True)
-        
-        # Detailed results tables
-        st.subheader("📋 Detailed Results")
-        
-        tab1, tab2, tab3, tab4 = st.tabs(["Monthly Rates", "WHO Details", "Ousmane Details", "Mohamed Details"])
-        
-        with tab1:
-            st.write("### Monthly Reporting Rates by Method (First 10 rows)")
-            pivot_table = results['monthly_rates'].pivot(
-                index='year_month', 
-                columns='method', 
-                values='reporting_rate'
-            ).round(2)
-            st.dataframe(pivot_table.head(10), use_container_width=True)
-            
-            # Download button for monthly rates
-            csv_monthly = io.StringIO()
-            pivot_table.to_csv(csv_monthly)
-            st.download_button(
-                label="📥 Download Monthly Rates (CSV)",
-                data=csv_monthly.getvalue(),
-                file_name=f"monthly_rates_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with tab2:
-            st.write("### WHO Method - Detailed Results (First 10 rows)")
-            st.dataframe(results['who_results'].head(10), use_container_width=True)
-            
-            # Download button for WHO results
-            csv_who = io.StringIO()
-            results['who_results'].to_csv(csv_who, index=False)
-            st.download_button(
-                label="📥 Download WHO Results (CSV)",
-                data=csv_who.getvalue(),
-                file_name=f"who_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with tab3:
-            st.write("### Ousmane Method - Detailed Results (First 10 rows)")
-            st.dataframe(results['ousmane_results'].head(10), use_container_width=True)
-            
-            # Download button for Ousmane results
-            csv_ousmane = io.StringIO()
-            results['ousmane_results'].to_csv(csv_ousmane, index=False)
-            st.download_button(
-                label="📥 Download Ousmane Results (CSV)",
-                data=csv_ousmane.getvalue(),
-                file_name=f"ousmane_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with tab4:
-            st.write("### Mohamed Method - Detailed Results (First 10 rows)")
-            st.dataframe(results['mohamed_results'].head(10), use_container_width=True)
-            
-            # Download button for Mohamed results
-            csv_mohamed = io.StringIO()
-            results['mohamed_results'].to_csv(csv_mohamed, index=False)
-            st.download_button(
-                label="📥 Download Mohamed Results (CSV)",
-                data=csv_mohamed.getvalue(),
-                file_name=f"mohamed_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        # Download section
-        st.subheader("💾 Download All Results")
-        
-        col1, col2 = st.columns(2)
-        
         with col1:
-            # CSV download for all results combined
-            csv_all = io.StringIO()
-            results['all_results'].to_csv(csv_all, index=False)
+            # Full dataset download
+            df_with_status = df.copy()
+            selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
+            df_with_status['Status'] = df_with_status[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
+            
+            csv_full = io.StringIO()
+            df_with_status.to_csv(csv_full, index=False)
             
             st.download_button(
-                label="📥 Download All Combined Results (CSV)",
-                data=csv_all.getvalue(),
-                file_name=f"all_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                label="📥 Download Full Dataset (CSV)",
+                data=csv_full.getvalue(),
+                file_name=f"full_dataset_with_status_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv"
             )
         
         with col2:
-            # Summary statistics download
-            csv_summary = io.StringIO()
-            summary_df = results['monthly_rates'].groupby('method').agg({
-                'reporting_rate': ['mean', 'min', 'max', 'std'],
-                'included_in_denominator': ['mean', 'min', 'max'],
-                'reported': ['mean', 'min', 'max']
-            }).round(2)
-            summary_df.to_csv(csv_summary)
+            # Regional statistics download
+            csv_regional = io.StringIO()
+            st.session_state.stats['regional_stats'].to_csv(csv_regional)
             
             st.download_button(
-                label="📥 Download Summary Statistics (CSV)",
+                label="📥 Download Regional Stats (CSV)",
+                data=csv_regional.getvalue(),
+                file_name=f"regional_statistics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
+        
+        with col3:
+            # Summary report download
+            summary_data = {
+                'Metric': ['Total Health Facilities', 'Total Time Periods', 'Total Records', 'Overall Reporting Rate (%)'],
+                'Value': [
+                    st.session_state.stats['total_hfs'],
+                    st.session_state.stats['total_months'],
+                    st.session_state.stats['total_records'],
+                    st.session_state.stats['overall_reporting_rate']
+                ]
+            }
+            summary_df = pd.DataFrame(summary_data)
+            
+            csv_summary = io.StringIO()
+            summary_df.to_csv(csv_summary, index=False)
+            
+            st.download_button(
+                label="📥 Download Summary Report (CSV)",
                 data=csv_summary.getvalue(),
-                file_name=f"summary_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                file_name=f"summary_report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv"
             )
 
@@ -759,6 +685,6 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>📊 Health Facility Reporting Rate Analysis Tool | Built with Streamlit</p>
+    <p>📊 Health Facility Reporting Status Analysis Tool | Built with Streamlit & Matplotlib</p>
 </div>
 """, unsafe_allow_html=True)
