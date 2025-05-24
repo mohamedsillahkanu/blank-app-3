@@ -331,61 +331,13 @@ if uploaded_file is not None:
             
             # Show processed data
             with st.expander("🔍 View Processed Data (First 10 rows)"):
-                display_cols = ['hf_uid', 'adm1', 'Date', 'allout', 'susp', 'test', 'conf', 'maltreat']
+                display_cols = ['hf_uid', 'adm1', 'Date', 'allout', 'susp', 'test', 'conf', 'maltreat', 'pres']
                 available_cols = [col for col in display_cols if col in df.columns]
                 st.dataframe(df[available_cols].head(10), use_container_width=True)
             
     except Exception as e:
         st.error(f"❌ Error reading file: {str(e)}")
 
-# Sample data option
-col1, col2 = st.columns([1, 1])
-with col1:
-    if st.session_state.df is None and st.button("📊 Use Sample Data", type="secondary"):
-        # Create sample data
-        np.random.seed(42)
-        years = [2023, 2024]
-        months = list(range(1, 13))
-        hf_uids = [f'HF_{i:03d}' for i in range(1, 101)]  # 100 health facilities
-        regions = ['North', 'South', 'East', 'West', 'Central', 'Northeast', 'Northwest', 'Southeast']
-        
-        sample_data = []
-        for hf in hf_uids:
-            # Assign each HF to a region
-            region = np.random.choice(regions)
-            
-            for year in years:
-                for month in months:
-                    # Simulate different reporting patterns
-                    if np.random.random() > 0.3:  # 70% chance of reporting
-                        allout = np.random.poisson(5)
-                        susp = np.random.poisson(3)
-                        test = np.random.poisson(4)
-                        conf = np.random.poisson(2)
-                        maltreat = np.random.poisson(2)
-                    else:
-                        allout = susp = test = conf = maltreat = 0
-                    
-                    date_str = f"{year}-{month:02d}"
-                    
-                    sample_data.append({
-                        'hf_uid': hf,
-                        'adm1': region,
-                        'Date': date_str,
-                        'allout': allout,
-                        'susp': susp,
-                        'test': test,
-                        'conf': conf,
-                        'maltreat': maltreat
-                    })
-        
-        df = pd.DataFrame(sample_data)
-        
-        # Validate and process the sample data
-        if validate_data(df):
-            st.session_state.df = df
-            st.success("✅ Sample data loaded!")
-            st.rerun()
 
 # Main analysis section
 if st.session_state.df is not None:
