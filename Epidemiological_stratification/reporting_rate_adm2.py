@@ -113,27 +113,16 @@ class HealthFacilityProcessor:
             st.error(f"❌ Missing required columns: {', '.join(missing_cols)}")
             return False
         
-        # Find admin column
-        potential_admin_cols = [col for col in self.df.columns if 
-                              any(keyword in col.lower() for keyword in ['adm', 'admin', 'region', 'district', 'province', 'state', 'county', 'zone'])]
-        
-        if not potential_admin_cols:
-            excluded_cols = ['hf_uid', 'allout', 'susp', 'test', 'conf', 'maltreat', 'month', 'year']
-            potential_admin_cols = [col for col in self.df.columns if col not in excluded_cols]
-        
-        if potential_admin_cols:
-            self.admin_col = st.selectbox(
-                "🗺️ Choose administrative level for regional analysis:",
-                options=potential_admin_cols,
-                help="Select the column that represents the administrative regions"
-            )
+        # Look for adm1 column specifically
+        if 'adm1' in self.df.columns:
+            self.admin_col = 'adm1'
             st.session_state.admin_col = self.admin_col
-            st.info(f"✅ Selected '{self.admin_col}' as administrative grouping level")
+            st.success(f"✅ Using 'adm1' as administrative grouping level")
             
             unique_regions = self.df[self.admin_col].unique()
-            st.write(f"**Found {len(unique_regions)} regions:** {', '.join(map(str, sorted(unique_regions)))}")
+            st.info(f"📍 Found {len(unique_regions)} regions: {', '.join(map(str, sorted(unique_regions)))}")
         else:
-            st.error("❌ No administrative level columns found in the data")
+            st.error("❌ 'adm1' column not found in the data. Please ensure your data contains an 'adm1' column.")
             return False
         
         st.success(f"✅ All validation checks passed! Ready for analysis with {len(self.df)} records")
