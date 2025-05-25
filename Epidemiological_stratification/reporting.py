@@ -489,7 +489,7 @@ if st.session_state.df is not None:
             """, unsafe_allow_html=True)
         
         # Show heatmap
-        st.write("### 🗺️ Interactive Regional Reporting Status Heatmap")
+        st.write("### 🗺️ Interactive Reporting Status Heatmap")
         st.pyplot(st.session_state.heatmap_fig)
         
         # Quick regeneration options
@@ -569,9 +569,6 @@ if st.session_state.df is not None:
                 st.balloons()
                 st.snow()
         
-        # Show detailed statistics
-        st.write("### 📊 Regional Statistics")
-        st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
         
         # Download section
         st.subheader("💾 Download Results")
@@ -594,40 +591,7 @@ if st.session_state.df is not None:
                 mime="text/csv"
             )
         
-        with col2:
-            # Regional statistics download
-            csv_regional = io.StringIO()
-            st.session_state.stats['regional_stats'].to_csv(csv_regional)
-            
-            st.download_button(
-                label="📥 Download Regional Stats (CSV)",
-                data=csv_regional.getvalue(),
-                file_name=f"regional_statistics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with col3:
-            # Summary report download
-            summary_data = {
-                'Metric': ['Total Health Facilities', 'Total Time Periods', 'Total Records', 'Overall Reporting Rate (%)'],
-                'Value': [
-                    st.session_state.stats['total_hfs'],
-                    st.session_state.stats['total_months'],
-                    st.session_state.stats['total_records'],
-                    st.session_state.stats['overall_reporting_rate']
-                ]
-            }
-            summary_df = pd.DataFrame(summary_data)
-            
-            csv_summary = io.StringIO()
-            summary_df.to_csv(csv_summary, index=False)
-            
-            st.download_button(
-                label="📥 Download Summary Report (CSV)",
-                data=csv_summary.getvalue(),
-                file_name=f"summary_report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
+
 
 else:
     # When no data is uploaded, show nothing or minimal message
