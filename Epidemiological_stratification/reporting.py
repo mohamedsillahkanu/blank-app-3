@@ -394,48 +394,6 @@ if st.session_state.df is not None:
         </div>
         """, unsafe_allow_html=True)
     
-    st.write("### 📊 Analysis Options")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div class="method-card">
-            <h4>🗺️ Regional Heatmap</h4>
-            <p>Visualize reporting patterns across different administrative regions with an intuitive heatmap display.</p>
-            <ul>
-                <li>Pink: No reporting</li>
-                <li>Light Blue: Reporting</li>
-                <li>Organized by region</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="method-card">
-            <h4>📊 Summary Statistics</h4>
-            <p>Comprehensive statistical analysis of reporting patterns by region and time period.</p>
-            <ul>
-                <li>Regional reporting rates</li>
-                <li>Facility counts</li>
-                <li>Temporal patterns</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class="method-card">
-            <h4>💾 Data Export</h4>
-            <p>Download processed data and analysis results in CSV format for further analysis.</p>
-            <ul>
-                <li>Full dataset with status</li>
-                <li>Regional summaries</li>
-                <li>Analysis results</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
     
     if st.button("🚀 Generate Customized Analysis", type="primary"):
         with st.spinner("Generating your customized reporting analysis..."):
