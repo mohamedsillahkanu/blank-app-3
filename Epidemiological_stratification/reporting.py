@@ -391,7 +391,100 @@ with col1:
 if st.session_state.df is not None:
     df = st.session_state.df
     
-   
+    # Analysis button
+    st.subheader("🎨 Customize Your Analysis")
+    
+    # Interactive customization options
+    st.write("### 🎯 Visualization Settings")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**🎨 Color Customization**")
+        no_report_color = st.color_picker("No Report Color", "#FFC0CB", help="Color for facilities that don't report")
+        report_color = st.color_picker("Report Color", "#ADD8E6", help="Color for facilities that do report")
+    
+    with col2:
+        st.markdown("**📝 Text Customization**")
+        main_title = st.text_input("Main Title", "Health Facility Reporting Status by ADM1", help="Title for the entire heatmap")
+        legend_title = st.text_input("Legend Title", "Reporting status", help="Title for the legend")
+    
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        no_report_label = st.text_input("No Report Label", "Do not report", help="Label for non-reporting facilities")
+    
+    with col4:
+        report_label = st.text_input("Report Label", "Report", help="Label for reporting facilities")
+    
+    # Color preview
+    st.write("### 🎨 Color Preview")
+    col_prev1, col_prev2, col_prev3 = st.columns(3)
+    
+    with col_prev1:
+        st.markdown(f"""
+        <div style="background-color: {no_report_color}; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0;">
+            <strong>{no_report_label}</strong>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_prev2:
+        st.markdown(f"""
+        <div style="background-color: #f0f0f0; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0; border: 2px dashed #ccc;">
+            <strong>VS</strong>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_prev3:
+        st.markdown(f"""
+        <div style="background-color: {report_color}; padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0;">
+            <strong>{report_label}</strong>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.write("### 📊 Analysis Options")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div class="method-card">
+            <h4>🗺️ Regional Heatmap</h4>
+            <p>Visualize reporting patterns across different administrative regions with an intuitive heatmap display.</p>
+            <ul>
+                <li>Pink: No reporting</li>
+                <li>Light Blue: Reporting</li>
+                <li>Organized by region</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="method-card">
+            <h4>📊 Summary Statistics</h4>
+            <p>Comprehensive statistical analysis of reporting patterns by region and time period.</p>
+            <ul>
+                <li>Regional reporting rates</li>
+                <li>Facility counts</li>
+                <li>Temporal patterns</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div class="method-card">
+            <h4>💾 Data Export</h4>
+            <p>Download processed data and analysis results in CSV format for further analysis.</p>
+            <ul>
+                <li>Full dataset with status</li>
+                <li>Regional summaries</li>
+                <li>Analysis results</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
     if st.button("🚀 Generate Customized Analysis", type="primary"):
         with st.spinner("Generating your customized reporting analysis..."):
             try:
@@ -444,7 +537,7 @@ if st.session_state.df is not None:
             """, unsafe_allow_html=True)
         
         # Show heatmap
-        st.write("### 🗺️ Interactive Reporting Status Heatmap")
+        st.write("### 🗺️ Interactive Regional Reporting Status Heatmap")
         st.pyplot(st.session_state.heatmap_fig)
         
         # Quick regeneration options
@@ -523,8 +616,7 @@ if st.session_state.df is not None:
             if st.button("🎉 Celebrate Results!", type="secondary"):
                 st.balloons()
                 st.snow()
-        
-       
+
 
 else:
     # When no data is uploaded, show nothing or minimal message
