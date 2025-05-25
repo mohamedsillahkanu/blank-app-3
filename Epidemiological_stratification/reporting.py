@@ -533,9 +533,9 @@ def generate_dual_heatmaps(df, admin_col, no_report_color='pink', report_color='
     return fig
 
 def generate_all_hfs_sorted_heatmap(df, no_report_color='pink', report_color='lightblue', 
-                                   main_title='All Health Facilities Sorted by Reporting Rate', 
-                                   legend_title='Reporting status', no_report_label='Do not report', 
-                                   report_label='Report'):
+                                    main_title='All Health Facilities Sorted by Reporting Rate', 
+                                    legend_title='Reporting status', no_report_label='Do not report', 
+                                    report_label='Report'):
     """Generate a single heatmap with all HFs sorted by reporting rate (highest to lowest)"""
     
     # Define the specific variables we want to analyze
