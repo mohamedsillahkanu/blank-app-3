@@ -338,84 +338,12 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"❌ Error reading file: {str(e)}")
 
-# Sample data option
-col1, col2 = st.columns([1, 1])
-with col1:
-    if st.session_state.df is None and st.button("📊 Use Sample Data", type="secondary"):
-        # Create sample data
-        np.random.seed(42)
-        years = [2023, 2024]
-        months = list(range(1, 13))
-        hf_uids = [f'HF_{i:03d}' for i in range(1, 101)]  # 100 health facilities
-        regions = ['North', 'South', 'East', 'West', 'Central', 'Northeast', 'Northwest', 'Southeast']
-        
-        sample_data = []
-        for hf in hf_uids:
-            # Assign each HF to a region
-            region = np.random.choice(regions)
-            
-            for year in years:
-                for month in months:
-                    # Simulate different reporting patterns
-                    if np.random.random() > 0.3:  # 70% chance of reporting
-                        allout = np.random.poisson(5)
-                        susp = np.random.poisson(3)
-                        test = np.random.poisson(4)
-                        conf = np.random.poisson(2)
-                        maltreat = np.random.poisson(2)
-                    else:
-                        allout = susp = test = conf = maltreat = 0
-                    
-                    date_str = f"{year}-{month:02d}"
-                    
-                    sample_data.append({
-                        'hf_uid': hf,
-                        'adm1': region,
-                        'Date': date_str,
-                        'allout': allout,
-                        'susp': susp,
-                        'test': test,
-                        'conf': conf,
-                        'maltreat': maltreat
-                    })
-        
-        df = pd.DataFrame(sample_data)
-        
-        # Validate and process the sample data
-        if validate_data(df):
-            st.session_state.df = df
-            st.success("✅ Sample data loaded!")
-            st.rerun()
+
 
 # Main analysis section
 if st.session_state.df is not None:
     df = st.session_state.df
     
-    # Analysis button
-    st.subheader("🎨 Customize Your Analysis")
-    
-    # Interactive customization options
-    st.write("### 🎯 Visualization Settings")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**🎨 Color Customization**")
-        no_report_color = st.color_picker("No Report Color", "#FFC0CB", help="Color for facilities that don't report")
-        report_color = st.color_picker("Report Color", "#ADD8E6", help="Color for facilities that do report")
-    
-    with col2:
-        st.markdown("**📝 Text Customization**")
-        main_title = st.text_input("Main Title", "Health Facility Reporting Status by ADM1", help="Title for the entire heatmap")
-        legend_title = st.text_input("Legend Title", "Reporting status", help="Title for the legend")
-    
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        no_report_label = st.text_input("No Report Label", "Do not report", help="Label for non-reporting facilities")
-    
-    with col4:
-        report_label = st.text_input("Report Label", "Report", help="Label for reporting facilities")
     
     # Color preview
     st.write("### 🎨 Color Preview")
