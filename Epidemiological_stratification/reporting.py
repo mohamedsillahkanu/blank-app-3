@@ -254,9 +254,13 @@ def generate_all_hfs_sorted_heatmap(df, no_report_color='pink', report_color='li
     heatmap_data = df_sorted.pivot(index='hf_uid', columns='Date', values='Status')
     heatmap_data.fillna(0, inplace=True)
     
+    # Optimized figure sizing
     n_hfs = len(hf_order)
-    height = max(12, min(50, n_hfs * 0.3))
-    width = max(16, len(heatmap_data.columns) * 0.5)
+    n_dates = len(heatmap_data.columns)
+    
+    # Calculate optimal dimensions
+    height = max(8, min(20, n_hfs * 0.15))  # Reduced height multiplier
+    width = max(12, min(16, n_dates * 0.4))  # More compact width
     
     custom_cmap = ListedColormap([no_report_color, report_color])
     
@@ -265,21 +269,24 @@ def generate_all_hfs_sorted_heatmap(df, no_report_color='pink', report_color='li
     sns.heatmap(
         heatmap_data,
         cmap=custom_cmap,
-        linewidths=0.1,
+        linewidths=0,  # Remove grid lines for cleaner look
         cbar=False,
-        yticklabels=True,
+        yticklabels=False,  # Remove y-tick labels
         xticklabels=True,
         annot=False,
         ax=ax
     )
     
-    ax.set_title(main_title, fontsize=18, fontweight='bold', pad=20)
-    ax.set_xlabel('Date', fontsize=14)
-    ax.set_ylabel('Health Facility ID (Sorted by Reporting Rate: High → Low)', fontsize=14)
+    # Clean styling
+    ax.set_title(main_title, fontsize=14, fontweight='bold', pad=15)
+    ax.set_xlabel('Date', fontsize=12)
+    ax.set_ylabel('Health Facility ID (Sorted by Reporting Rate: High → Low)', fontsize=12)
     
-    ax.tick_params(axis='x', labelrotation=45, labelsize=10)
-    ax.tick_params(axis='y', labelsize=8)
+    # Optimize tick parameters
+    ax.tick_params(axis='x', labelrotation=45, labelsize=9)
+    ax.tick_params(axis='y', labelsize=0)  # Hide y-tick labels
     
+    # Compact legend
     legend_labels = [no_report_label, report_label]
     legend_colors = [custom_cmap(0), custom_cmap(1)]
     legend_patches = [Patch(color=color, label=label) 
@@ -288,19 +295,11 @@ def generate_all_hfs_sorted_heatmap(df, no_report_color='pink', report_color='li
     ax.legend(
         handles=legend_patches,
         loc='upper right',
-        bbox_to_anchor=(1.15, 1),
+        bbox_to_anchor=(1.02, 1),
         title=legend_title,
-        fontsize=12,
-        title_fontsize=14
+        fontsize=10,
+        title_fontsize=11
     )
-    
-    for i, hf_uid in enumerate(hf_order[:min(50, len(hf_order))]):
-        rate = hf_reporting_rates[hf_reporting_rates['hf_uid'] == hf_uid]['reporting_rate'].iloc[0]
-        ax.text(len(heatmap_data.columns) + 0.5, i + 0.5, f'{rate}%', 
-                va='center', ha='left', fontsize=8, alpha=0.8)
-    
-    ax.text(len(heatmap_data.columns) + 0.5, -1, 'Rate%', 
-            va='center', ha='left', fontsize=10, fontweight='bold')
     
     plt.tight_layout()
     return fig, hf_reporting_rates
