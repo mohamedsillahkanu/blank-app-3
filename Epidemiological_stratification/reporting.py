@@ -344,6 +344,30 @@ if uploaded_file is not None:
 if st.session_state.df is not None:
     df = st.session_state.df
     
+
+    
+    # Interactive customization options
+    st.write("### 🎯 Visualization Settings")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**🎨 Color Customization**")
+        no_report_color = st.color_picker("No Report Color", "#FFC0CB", help="Color for facilities that don't report")
+        report_color = st.color_picker("Report Color", "#ADD8E6", help="Color for facilities that do report")
+    
+    with col2:
+        st.markdown("**📝 Text Customization**")
+        main_title = st.text_input("Main Title", "Health Facility Reporting Status by ADM1", help="Title for the entire heatmap")
+        legend_title = st.text_input("Legend Title", "Reporting status", help="Title for the legend")
+    
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        no_report_label = st.text_input("No Report Label", "Do not report", help="Label for non-reporting facilities")
+    
+    with col4:
+        report_label = st.text_input("Report Label", "Report", help="Label for reporting facilities")
     
     # Color preview
     st.write("### 🎨 Color Preview")
@@ -544,7 +568,66 @@ if st.session_state.df is not None:
             if st.button("🎉 Celebrate Results!", type="secondary"):
                 st.balloons()
                 st.snow()
-
+        
+        # Show detailed statistics
+        st.write("### 📊 Regional Statistics")
+        st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
+        
+        # Download section
+        st.subheader("💾 Download Results")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Full dataset download
+            df_with_status = df.copy()
+            selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
+            df_with_status['Status'] = df_with_status[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
+            
+            csv_full = io.StringIO()
+            df_with_status.to_csv(csv_full, index=False)
+            
+            st.download_button(
+                label="📥 Download Full Dataset (CSV)",
+                data=csv_full.getvalue(),
+                file_name=f"full_dataset_with_status_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
+        
+        with col2:
+            # Regional statistics download
+            csv_regional = io.StringIO()
+            st.session_state.stats['regional_stats'].to_csv(csv_regional)
+            
+            st.download_button(
+                label="📥 Download Regional Stats (CSV)",
+                data=csv_regional.getvalue(),
+                file_name=f"regional_statistics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
+        
+        with col3:
+            # Summary report download
+            summary_data = {
+                'Metric': ['Total Health Facilities', 'Total Time Periods', 'Total Records', 'Overall Reporting Rate (%)'],
+                'Value': [
+                    st.session_state.stats['total_hfs'],
+                    st.session_state.stats['total_months'],
+                    st.session_state.stats['total_records'],
+                    st.session_state.stats['overall_reporting_rate']
+                ]
+            }
+            summary_df = pd.DataFrame(summary_data)
+            
+            csv_summary = io.StringIO()
+            summary_df.to_csv(csv_summary, index=False)
+            
+            st.download_button(
+                label="📥 Download Summary Report (CSV)",
+                data=csv_summary.getvalue(),
+                file_name=f"summary_report_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
 
 else:
     # When no data is uploaded, show nothing or minimal message
