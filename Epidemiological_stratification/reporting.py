@@ -1,222 +1,4 @@
-# Show results if analysis is complete
-    if st.session_state.analysis_complete:
-        analysis_type = getattr(st.session_state, 'analysis_type', 'dual')
-        
-        if analysis_type == "dual":
-            st.subheader("📈 Dual Heatmap Analysis Results")
-            
-            st.markdown("""
-            <div class="info-box">
-                <h4>📊 Understanding the Dual Heatmaps</h4>
-                <p><strong>Top Heatmap:</strong> Shows ALL health facilities in your dataset</p>
-                <p><strong>Bottom Heatmap:</strong> Shows only health facilities with at least one record (allout + susp + test + conf + maltreat > 0)</p>
-                <p>This comparison helps identify which facilities are consistently reporting versus those that may be inactive or have data quality issues.</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        else:  # sorted analysis
-            st.subheader("📈 All Health Facilities Sorted by Reporting Rate")
-            
-            st.markdown("""
-            <div class="info-box">
-                <h4>📊 Understanding the Sorted Heatmap</h4>
-                <p><strong>Y-Axis:</strong> All health facilities sorted by reporting rate (highest to lowest)</p>
-                <p><strong>X-Axis:</strong> Time periods showing reporting patterns</p>
-                <p><strong>Right Side:</strong> Reporting rate percentage for each facility</p>
-                <p>This view helps identify top performers and facilities that may need attention.</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Show top and bottom performers
-            if hasattr(st.session_state, 'hf_reporting_rates'):
-                rates_df = st.session_state.hf_reporting_rates
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("### 🏆 Top 10 Performing Health Facilities")
-                    top_10 = rates_df.head(10)[['hf_uid', 'reporting_rate', 'sum', 'count']].copy()
-                    top_10.columns = ['Health Facility', 'Reporting Rate (%)', 'Reported Months', 'Total Months']
-                    st.dataframe(top_10, use_container_width=True)
-                
-                with col2:
-                    st.markdown("### ⚠️ Bottom 10 Performing Health Facilities")
-                    bottom_10 = rates_df.tail(10)[['hf_uid', 'reporting_rate', 'sum', 'count']].copy()
-                    bottom_10.columns = ['Health Facility', 'Reporting Rate (%)', 'Reported Months', 'Total Months']
-                    st.dataframe(bottom_10, use_container_width=True)
-                
-                # Summary statistics for sorted view
-                st.markdown("### 📊 Reporting Rate Distribution")
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    avg_rate = rates_df['reporting_rate'].mean()
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>Average Rate</h4>
-                        <h2>{avg_rate:.1f}%</h2>
-                        <p>Mean reporting rate</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col2:
-                    median_rate = rates_df['reporting_rate'].median()
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>Median Rate</h4>
-                        <h2>{median_rate:.1f}%</h2>
-                        <p>50th percentile</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col3:
-                    high_performers = (rates_df['reporting_rate'] >= 80).sum()
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>High Performers</h4>
-                        <h2>{high_performers}</h2>
-                        <p>≥80% reporting rate</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col4:
-                    low_performers = (rates_df['reporting_rate'] <= 20).sum()
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>Low Performers</h4>
-                        <h2>{low_performers}</h2>
-                        <p>≤20% reporting rate</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-        
-        # Show heatmaps
-        st.markdown('<div class="heatmap-container">', unsafe_allow_html=True)
-        st.pyplot(st.session_state.heatmap_fig)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Show detailed statistics (only for dual analysis)
-        if analysis_type == "dual":
-            st.write("### 📊 Regional Statistics - All Health Facilities")
-            st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
-            
-            if not st.session_state.stats['regional_stats_with_records'].empty:
-                st.write("### 📊 Regional Statistics - Health Facilities with Records Only")
-                st.dataframe(st.session_state.stats['regional_stats_with_records'], use_container_width=True)
-        
-        # Download section
-        st.subheader("💾 Download Results")
-        
-        if analysis_type == "dual":
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                # Full dataset download
-                df_with_status = df.copy()
-                selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
-                df_with_status['Status'] = df_with_status[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
-                df_with_status['Has_Records'] = df_with_status['Status']
-                
-                csv_full = io.StringIO()
-                df_with_status.to_csv(csv_full, index=False)
-                
-                st.download_button(
-                    label="📥 Download Full Dataset (CSV)",
-                    data=csv_full.getvalue(),
-                    file_name=f"dual_analysis_dataset_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv"
-                )
-            
-            with col2:
-                # Regional statistics download
-                csv_regional = io.StringIO()
-                st.session_state.stats['regional_stats'].to_csv(csv_regional)
-                
-                st.download_button(
-                    label="📥 Download All HFs Stats (CSV)",
-                    data=csv_regional.getvalue(),
-                    file_name=f"all_hfs_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv"
-                )
-            
-            with col3:
-                if not st.session_state.stats['regional_stats_with_records'].empty:
-                    csv_active = io.StringIO()
-                    st.session_state.stats['regional_stats_with_records'].to_csv(csv_active)
-                    
-                    st.download_button(
-                        label="📥 Download Active HFs Stats (CSV)",
-                        data=csv_active.getvalue(),
-                        file_name=f"active_hfs_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                        mime="text/csv"
-                    )
-        
-        else:  # sorted analysis downloads
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                # Full dataset with reporting rates
-                df_with_rates = df.copy()
-                selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
-                df_with_rates['Status'] = df_with_rates[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
-                
-                # Add reporting rates
-                if hasattr(st.session_state, 'hf_reporting_rates'):
-                    rates_dict = dict(zip(st.session_state.hf_reporting_rates['hf_uid'], 
-                                        st.session_state.hf_reporting_rates['reporting_rate']))
-                    df_with_rates['HF_Reporting_Rate'] = df_with_rates['hf_uid'].map(rates_dict)
-                
-                csv_full = io.StringIO()
-                df_with_rates.to_csv(csv_full, index=False)
-                
-                st.download_button(
-                    label="📥 Download Dataset with Rates (CSV)",
-                    data=csv_full.getvalue(),
-                    file_name=f"sorted_analysis_dataset_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv"
-                )
-            
-            with col2:
-                # Health facility reporting rates
-                if hasattr(st.session_state, 'hf_reporting_rates'):
-                    csv_rates = io.StringIO()
-                    st.session_state.hf_reporting_rates.to_csv(csv_rates, index=False)
-                    
-                    st.download_button(
-                        label="📥 Download HF Reporting Rates (CSV)",
-                        data=csv_rates.getvalue(),
-                        file_name=f"hf_reporting_rates_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                        mime="text/csv"
-                    )
-            
-            with col3:
-                # Performance summary
-                if hasattr(st.session_state, 'hf_reporting_rates'):
-                    rates_df = st.session_state.hf_reporting_rates
-                    performance_summary = pd.DataFrame({
-                        'Performance_Category': ['High Performers (≥80%)', 'Medium Performers (20-79%)', 'Low Performers (≤20%)', 'Zero Performers (0%)'],
-                        'Count': [
-                            (rates_df['reporting_rate'] >= 80).sum(),
-                            ((rates_df['reporting_rate'] >= 20) & (rates_df['reporting_rate'] < 80)).sum(),
-                            ((rates_df['reporting_rate'] > 0) & (rates_df['reporting_rate'] <= 20)).sum(),
-                            (rates_df['reporting_rate'] == 0).sum()
-                        ],
-                        'Percentage': [
-                            ((rates_df['reporting_rate'] >= 80).sum() / len(rates_df) * 100).round(2),
-                            (((rates_df['reporting_rate'] >= 20) & (rates_df['reporting_rate'] < 80)).sum() / len(rates_df) * 100).round(2),
-                            (((rates_df['reporting_rate'] > 0) & (rates_df['reporting_rate'] <= 20)).sum() / len(rates_df) * 100).round(2),
-                            ((rates_df['reporting_rate'] == 0).sum() / len(rates_df) * 100).round(2)
-                        ]
-                    })
-                    
-                    csv_summary = io.StringIO()
-                    performance_summary.to_csv(csv_summary, index=False)
-                    
-                    st.download_button(
-                        label="📥 Download Performance Summary (CSV)",
-                        data=csv_summary.getvalue(),
-                        file_name=f"performance_summary_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                        mime="text/csv"
-                    )import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import io
@@ -879,6 +661,246 @@ if st.session_state.df is not None:
                     # Update session state
                     st.session_state.analysis_complete = True
                     st.session_state.heatmap_fig = fig
+                    st.session_state.hf_reporting_rates = hf_rates
+                    st.session_state.stats = stats
+                    st.session_state.selected_admin_col = selected_admin_col
+                    st.session_state.analysis_type = "sorted"
+                    
+                except Exception as e:
+                    st.error(f"Error generating sorted analysis: {str(e)}")
+            
+            st.success("✅ Sorted heatmap analysis completed!")
+            st.rerun()
+    
+    # Show results if analysis is complete
+    if st.session_state.analysis_complete:
+        analysis_type = getattr(st.session_state, 'analysis_type', 'dual')
+        
+        if analysis_type == "dual":
+            st.subheader("📈 Dual Heatmap Analysis Results")
+            
+            st.markdown("""
+            <div class="info-box">
+                <h4>📊 Understanding the Dual Heatmaps</h4>
+                <p><strong>Top Heatmap:</strong> Shows ALL health facilities in your dataset</p>
+                <p><strong>Bottom Heatmap:</strong> Shows only health facilities with at least one record (allout + susp + test + conf + maltreat > 0)</p>
+                <p>This comparison helps identify which facilities are consistently reporting versus those that may be inactive or have data quality issues.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        else:  # sorted analysis
+            st.subheader("📈 All Health Facilities Sorted by Reporting Rate")
+            
+            st.markdown("""
+            <div class="info-box">
+                <h4>📊 Understanding the Sorted Heatmap</h4>
+                <p><strong>Y-Axis:</strong> All health facilities sorted by reporting rate (highest to lowest)</p>
+                <p><strong>X-Axis:</strong> Time periods showing reporting patterns</p>
+                <p><strong>Right Side:</strong> Reporting rate percentage for each facility</p>
+                <p>This view helps identify top performers and facilities that may need attention.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Show top and bottom performers
+            if hasattr(st.session_state, 'hf_reporting_rates'):
+                rates_df = st.session_state.hf_reporting_rates
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("### 🏆 Top 10 Performing Health Facilities")
+                    top_10 = rates_df.head(10)[['hf_uid', 'reporting_rate', 'sum', 'count']].copy()
+                    top_10.columns = ['Health Facility', 'Reporting Rate (%)', 'Reported Months', 'Total Months']
+                    st.dataframe(top_10, use_container_width=True)
+                
+                with col2:
+                    st.markdown("### ⚠️ Bottom 10 Performing Health Facilities")
+                    bottom_10 = rates_df.tail(10)[['hf_uid', 'reporting_rate', 'sum', 'count']].copy()
+                    bottom_10.columns = ['Health Facility', 'Reporting Rate (%)', 'Reported Months', 'Total Months']
+                    st.dataframe(bottom_10, use_container_width=True)
+                
+                # Summary statistics for sorted view
+                st.markdown("### 📊 Reporting Rate Distribution")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    avg_rate = rates_df['reporting_rate'].mean()
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h4>Average Rate</h4>
+                        <h2>{avg_rate:.1f}%</h2>
+                        <p>Mean reporting rate</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    median_rate = rates_df['reporting_rate'].median()
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h4>Median Rate</h4>
+                        <h2>{median_rate:.1f}%</h2>
+                        <p>50th percentile</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col3:
+                    high_performers = (rates_df['reporting_rate'] >= 80).sum()
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h4>High Performers</h4>
+                        <h2>{high_performers}</h2>
+                        <p>≥80% reporting rate</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col4:
+                    low_performers = (rates_df['reporting_rate'] <= 20).sum()
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h4>Low Performers</h4>
+                        <h2>{low_performers}</h2>
+                        <p>≤20% reporting rate</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        # Show heatmaps
+        st.markdown('<div class="heatmap-container">', unsafe_allow_html=True)
+        st.pyplot(st.session_state.heatmap_fig)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Show detailed statistics (only for dual analysis)
+        if analysis_type == "dual":
+            st.write("### 📊 Regional Statistics - All Health Facilities")
+            st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
+            
+            if not st.session_state.stats['regional_stats_with_records'].empty:
+                st.write("### 📊 Regional Statistics - Health Facilities with Records Only")
+                st.dataframe(st.session_state.stats['regional_stats_with_records'], use_container_width=True)
+        
+        # Download section
+        st.subheader("💾 Download Results")
+        
+        if analysis_type == "dual":
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Full dataset download
+                df_with_status = df.copy()
+                selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
+                df_with_status['Status'] = df_with_status[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
+                df_with_status['Has_Records'] = df_with_status['Status']
+                
+                csv_full = io.StringIO()
+                df_with_status.to_csv(csv_full, index=False)
+                
+                st.download_button(
+                    label="📥 Download Full Dataset (CSV)",
+                    data=csv_full.getvalue(),
+                    file_name=f"dual_analysis_dataset_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col2:
+                # Regional statistics download
+                csv_regional = io.StringIO()
+                st.session_state.stats['regional_stats'].to_csv(csv_regional)
+                
+                st.download_button(
+                    label="📥 Download All HFs Stats (CSV)",
+                    data=csv_regional.getvalue(),
+                    file_name=f"all_hfs_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col3:
+                if not st.session_state.stats['regional_stats_with_records'].empty:
+                    csv_active = io.StringIO()
+                    st.session_state.stats['regional_stats_with_records'].to_csv(csv_active)
+                    
+                    st.download_button(
+                        label="📥 Download Active HFs Stats (CSV)",
+                        data=csv_active.getvalue(),
+                        file_name=f"active_hfs_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime="text/csv"
+                    )
+        
+        else:  # sorted analysis downloads
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Full dataset with reporting rates
+                df_with_rates = df.copy()
+                selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
+                df_with_rates['Status'] = df_with_rates[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
+                
+                # Add reporting rates
+                if hasattr(st.session_state, 'hf_reporting_rates'):
+                    rates_dict = dict(zip(st.session_state.hf_reporting_rates['hf_uid'], 
+                                        st.session_state.hf_reporting_rates['reporting_rate']))
+                    df_with_rates['HF_Reporting_Rate'] = df_with_rates['hf_uid'].map(rates_dict)
+                
+                csv_full = io.StringIO()
+                df_with_rates.to_csv(csv_full, index=False)
+                
+                st.download_button(
+                    label="📥 Download Dataset with Rates (CSV)",
+                    data=csv_full.getvalue(),
+                    file_name=f"sorted_analysis_dataset_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv"
+                )
+            
+            with col2:
+                # Health facility reporting rates
+                if hasattr(st.session_state, 'hf_reporting_rates'):
+                    csv_rates = io.StringIO()
+                    st.session_state.hf_reporting_rates.to_csv(csv_rates, index=False)
+                    
+                    st.download_button(
+                        label="📥 Download HF Reporting Rates (CSV)",
+                        data=csv_rates.getvalue(),
+                        file_name=f"hf_reporting_rates_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime="text/csv"
+                    )
+            
+            with col3:
+                # Performance summary
+                if hasattr(st.session_state, 'hf_reporting_rates'):
+                    rates_df = st.session_state.hf_reporting_rates
+                    performance_summary = pd.DataFrame({
+                        'Performance_Category': ['High Performers (≥80%)', 'Medium Performers (20-79%)', 'Low Performers (≤20%)', 'Zero Performers (0%)'],
+                        'Count': [
+                            (rates_df['reporting_rate'] >= 80).sum(),
+                            ((rates_df['reporting_rate'] >= 20) & (rates_df['reporting_rate'] < 80)).sum(),
+                            ((rates_df['reporting_rate'] > 0) & (rates_df['reporting_rate'] <= 20)).sum(),
+                            (rates_df['reporting_rate'] == 0).sum()
+                        ],
+                        'Percentage': [
+                            ((rates_df['reporting_rate'] >= 80).sum() / len(rates_df) * 100).round(2),
+                            (((rates_df['reporting_rate'] >= 20) & (rates_df['reporting_rate'] < 80)).sum() / len(rates_df) * 100).round(2),
+                            (((rates_df['reporting_rate'] > 0) & (rates_df['reporting_rate'] <= 20)).sum() / len(rates_df) * 100).round(2),
+                            ((rates_df['reporting_rate'] == 0).sum() / len(rates_df) * 100).round(2)
+                        ]
+                    })
+                    
+                    csv_summary = io.StringIO()
+                    performance_summary.to_csv(csv_summary, index=False)
+                    
+                    st.download_button(
+                        label="📥 Download Performance Summary (CSV)",
+                        data=csv_summary.getvalue(),
+                        file_name=f"performance_summary_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime="text/csv"
+                    )
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #666; padding: 1rem;">
+    <p>📊 Enhanced Health Facility Reporting Analysis Tool | Built with Streamlit & Matplotlib</p>
+    <p>Features: Administrative Level Selection • Dual Heatmap Analysis • Individual Performance Ranking • Comprehensive Statistics</p>
+</div>
+""", unsafe_allow_html=True)analysis_complete = True
+                    st.session_state.heatmap_fig = fig
                     st.session_state.stats = stats
                     st.session_state.selected_admin_col = selected_admin_col
                     st.session_state.analysis_type = "dual"
@@ -905,96 +927,4 @@ if st.session_state.df is not None:
                     )
                     
                     # Update session state
-                    st.session_state.analysis_complete = True
-                    st.session_state.heatmap_fig = fig
-                    st.session_state.hf_reporting_rates = hf_rates
-                    st.session_state.stats = stats
-                    st.session_state.selected_admin_col = selected_admin_col
-                    st.session_state.analysis_type = "sorted"
-                    
-                except Exception as e:
-                    st.error(f"Error generating sorted analysis: {str(e)}")
-            
-            st.success("✅ Sorted heatmap analysis completed!")
-            st.rerun()
-    
-    # Show results if analysis is complete
-    if st.session_state.analysis_complete:
-        st.subheader("📈 Dual Heatmap Analysis Results")
-        
-        st.markdown("""
-        <div class="info-box">
-            <h4>📊 Understanding the Dual Heatmaps</h4>
-            <p><strong>Top Heatmap:</strong> Shows ALL health facilities in your dataset</p>
-            <p><strong>Bottom Heatmap:</strong> Shows only health facilities with at least one record (allout + susp + test + conf + maltreat > 0)</p>
-            <p>This comparison helps identify which facilities are consistently reporting versus those that may be inactive or have data quality issues.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Show heatmaps
-        st.markdown('<div class="heatmap-container">', unsafe_allow_html=True)
-        st.pyplot(st.session_state.heatmap_fig)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Show detailed statistics
-        st.write("### 📊 Regional Statistics - All Health Facilities")
-        st.dataframe(st.session_state.stats['regional_stats'], use_container_width=True)
-        
-        if not st.session_state.stats['regional_stats_with_records'].empty:
-            st.write("### 📊 Regional Statistics - Health Facilities with Records Only")
-            st.dataframe(st.session_state.stats['regional_stats_with_records'], use_container_width=True)
-        
-        # Download section
-        st.subheader("💾 Download Results")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            # Full dataset download
-            df_with_status = df.copy()
-            selected_variables = ['allout', 'susp', 'test', 'conf', 'maltreat']
-            df_with_status['Status'] = df_with_status[selected_variables].sum(axis=1).apply(lambda x: 1 if x > 0 else 0)
-            df_with_status['Has_Records'] = df_with_status['Status']
-            
-            csv_full = io.StringIO()
-            df_with_status.to_csv(csv_full, index=False)
-            
-            st.download_button(
-                label="📥 Download Full Dataset (CSV)",
-                data=csv_full.getvalue(),
-                file_name=f"dual_analysis_dataset_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with col2:
-            # Regional statistics download
-            csv_regional = io.StringIO()
-            st.session_state.stats['regional_stats'].to_csv(csv_regional)
-            
-            st.download_button(
-                label="📥 Download All HFs Stats (CSV)",
-                data=csv_regional.getvalue(),
-                file_name=f"all_hfs_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv"
-            )
-        
-        with col3:
-            if not st.session_state.stats['regional_stats_with_records'].empty:
-                csv_active = io.StringIO()
-                st.session_state.stats['regional_stats_with_records'].to_csv(csv_active)
-                
-                st.download_button(
-                    label="📥 Download Active HFs Stats (CSV)",
-                    data=csv_active.getvalue(),
-                    file_name=f"active_hfs_stats_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv"
-                )
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: #666; padding: 1rem;">
-    <p>📊 Enhanced Health Facility Reporting Analysis Tool | Built with Streamlit & Matplotlib</p>
-    <p>Features: Administrative Level Selection • Dual Heatmap Analysis • Comprehensive Statistics</p>
-</div>
-""", unsafe_allow_html=True)
+                    st.session_
