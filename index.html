@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Management and Analysis Tool</title>
+    <style>
+        /* CSS Variables for easy theming */
+        :root {
+            --primary: #1E88E5;
+            --secondary: #90CAF9;
+            --background: #E3F2FD;
+            --text: #0D47A1;
+            --accent: #64B5F6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--background) 0%, var(--primary) 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Dashboard title styling */
+        .dashboard-title {
+            background-color: var(--primary);
+            padding: 30px;
+            border-radius: 15px;
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .dashboard-title h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .dashboard-title p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* Breadcrumb navigation */
+        .breadcrumb {
+            background-color: var(--secondary);
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            color: var(--text);
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Grid layout for modules */
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        /* Module cards */
+        .module-card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 30px;
+            border-left: 6px solid var(--accent);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .module-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .module-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .module-card:hover::before {
+            opacity: 1;
+        }
+
+        .module-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .module-icon {
+            font-size: 2.5rem;
+            margin-right: 15px;
+            animation: pulse 2s infinite;
+        }
+
+        .module-card h3 {
+            color: var(--text);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .module-card p {
+            color: #666;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .module-button {
+            background: linear-gradient(45deg, var(--primary), var(--accent));
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .module-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(30, 136, 229, 0.4);
+        }
+
+        /* Sub-module cards */
+        .sub-module-card {
+            background-color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--accent);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .sub-module-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .sub-module-icon {
+            font-size: 1.8rem;
+            margin-right: 12px;
+        }
+
+        /* Back buttons */
+        .back-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .back-button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-button:hover {
+            background-color: var(--primary);
+            transform: translateX(-3px);
+        }
+
+        /* Footer styling */
+        .footer {
+            background: linear-gradient(45deg, var(--primary), var(--text));
+            padding: 25px;
+            border-radius: 15px;
+            color: white;
+            text-align: center;
+            margin-top: 40px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .footer p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+
+        /* Hidden sections */
+        .hidden {
+            display: none;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .modules-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .dashboard-title h1 {
+                font-size: 2rem;
+            }
+            
+            .back-buttons {
+                flex-direction: column;
+            }
+        }
+
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-title">
+            <h1>📊 Data Management and Analysis Tool</h1>
+            <p id="greeting"></p>
+        </div>
+
+        <!-- Breadcrumb Navigation -->
+        <div class="breadcrumb" id="breadcrumb">
+            🏠 Dashboard
+        </div>
+
+        <!-- Main Dashboard View -->
+        <div id="main-dashboard">
+            <h2 style="color: var(--text); margin-bottom: 25px; font-size: 1.8rem;">Select a Data Analysis Module</h2>
+            
+            <div class="modules-grid">
+                <div class="module-card" data-module="data-assembly">
+                    <div class="module-header">
+                        <span class="module-icon">🗂️</span>
+                        <h3>Data Assembly and Management</h3>
+                    </div>
+                    <p>Assemble datasets and manage data preprocessing workflows with advanced tools for data cleaning, transformation, and quality assessment.</p>
+                    <button class="module-button" onclick="openModule('data-assembly')">
+                        Open Data Assembly
+                    </button>
+                </div>
+
+                <div class="module-card" data-module="epidemiological">
+                    <div class="module-header">
+                        <span class="module-icon">📊</span>
+                        <h3>Epidemiological Stratification</h3>
+                    </div>
+                    <p>Analyze epidemiological data and identify patterns through statistical analysis, visualization, and risk stratification methods.</p>
+                    <button class="module-button" onclick="openModule('epidemiological')">
+                        Open Epidemiological Analysis
+                    </button>
+                </div>
+
+                <div class="module-card" data-module="interventions">
+                    <div class="module-header">
+                        <span class="module-icon">📈</span>
+                        <h3>Review of Past Interventions</h3>
+                    </div>
+                    <p>Evaluate the effectiveness of previous health interventions using comprehensive analysis and outcome measurement tools.</p>
+                    <button class="module-button" onclick="openModule('interventions')">
+                        Open Intervention Review
+                    </button>
+                </div>
+
+                <div class="module-card" data-module="targeting">
+                    <div class="module-header">
+                        <span class="module-icon">🎯</span>
+                        <h3>Intervention Targeting</h3>
+                    </div>
+                    <p>Plan and optimize new health intervention strategies with advanced targeting algorithms and resource allocation tools.</p>
+                    <button class="module-button" onclick="openModule('targeting')">
+                        Open Intervention Targeting
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module Detail Views -->
+        <div id="module-detail" class="hidden">
+            <div class="back-buttons">
+                <button class="back-button" onclick="backToDashboard()">
+                    ← Back to Dashboard
+                </button>
+            </div>
+            
+            <div id="module-content">
+                <!-- Module content will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Sub-module Views -->
+        <div id="sub-module-detail" class="hidden">
+            <div class="back-buttons">
+                <button class="back-button" onclick="backToModule()">
+                    ← Back to Module
+                </button>
+                <button class="back-button" onclick="backToDashboard()">
+                    ← Back to Dashboard
+                </button>
+            </div>
+            
+            <div id="sub-module-content">
+                <!-- Sub-module content will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>© 2025 Data Management and Analysis Tool | Version 1.0</p>
+            <p>Last updated: June 16, 2025</p>
+            <p>Developer: MS Kanu</p>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let currentModule = null;
+        let currentSubModule = null;
+
+        // Module configurations
+        const moduleConfig = {
+            'data-assembly': {
+                name: 'Data Assembly and Management',
+                icon: '🗂️',
+                subModules: [
+                    { id: 'data-import', name: 'Data Import', icon: '📥', desc: 'Import data from various sources' },
+                    { id: 'data-cleaning', name: 'Data Cleaning', icon: '🧹', desc: 'Clean and preprocess datasets' },
+                    { id: 'data-validation', name: 'Data Validation', icon: '✅', desc: 'Validate data quality and integrity' },
+                    { id: 'data-export', name: 'Data Export', icon: '📤', desc: 'Export processed data' }
+                ]
+            },
+            'epidemiological': {
+                name: 'Epidemiological Stratification',
+                icon: '📊',
+                subModules: [
+                    { id: 'statistical-analysis', name: 'Statistical Analysis', icon: '📈', desc: 'Perform statistical analysis on epidemiological data' },
+                    { id: 'risk-stratification', name: 'Risk Stratification', icon: '⚠️', desc: 'Stratify populations by risk factors' },
+                    { id: 'pattern-recognition', name: 'Pattern Recognition', icon: '🔍', desc: 'Identify patterns in disease occurrence' },
+                    { id: 'visualization', name: 'Data Visualization', icon: '📊', desc: 'Create visualizations for epidemiological data' }
+                ]
+            },
+            'interventions': {
+                name: 'Review of Past Interventions',
+                icon: '📈',
+                subModules: [
+                    { id: 'outcome-analysis', name: 'Outcome Analysis', icon: '📋', desc: 'Analyze intervention outcomes' },
+                    { id: 'effectiveness-review', name: 'Effectiveness Review', icon: '🔬', desc: 'Review intervention effectiveness' },
+                    { id: 'cost-benefit', name: 'Cost-Benefit Analysis', icon: '💰', desc: 'Analyze cost-effectiveness' },
+                    { id: 'report-generation', name: 'Report Generation', icon: '📄', desc: 'Generate comprehensive reports' }
+                ]
+            },
+            'targeting': {
+                name: 'Intervention Targeting',
+                icon: '🎯',
+                subModules: [
+                    { id: 'population-analysis', name: 'Population Analysis', icon: '👥', desc: 'Analyze target populations' },
+                    { id: 'resource-allocation', name: 'Resource Allocation', icon: '📊', desc: 'Optimize resource distribution' },
+                    { id: 'strategy-planning', name: 'Strategy Planning', icon: '📋', desc: 'Plan intervention strategies' },
+                    { id: 'impact-prediction', name: 'Impact Prediction', icon: '🔮', desc: 'Predict intervention impact' }
+                ]
+            }
+        };
+
+        // Initialize the page
+        function init() {
+            updateGreeting();
+            updateBreadcrumb();
+        }
+
+        // Update greeting based on time of day
+        function updateGreeting() {
+            const now = new Date();
+            const hour = now.getHours();
+            let greeting = '';
+            
+            if (hour < 12) {
+                greeting = 'Good Morning';
+            } else if (hour < 18) {
+                greeting = 'Good Afternoon';
+            } else {
+                greeting = 'Good Evening';
+            }
+            
+            const dateStr = now.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            document.getElementById('greeting').textContent = `${greeting} | ${dateStr}`;
+        }
+
+        // Update breadcrumb navigation
+        function updateBreadcrumb() {
+            let breadcrumb = '🏠 Dashboard';
+            
+            if (currentModule) {
+                const config = moduleConfig[currentModule];
+                breadcrumb += ` > 📁 ${config.name}`;
+            }
+            
+            if (currentSubModule) {
+                const config = moduleConfig[currentModule];
+                const subConfig = config.subModules.find(sub => sub.id === currentSubModule);
+                breadcrumb += ` > 📄 ${subConfig.name}`;
+            }
+            
+            document.getElementById('breadcrumb').textContent = breadcrumb;
+        }
+
+        // Open a main module
+        function openModule(moduleId) {
+            currentModule = moduleId;
+            currentSubModule = null;
+            
+            const config = moduleConfig[moduleId];
+            
+            // Show module detail view
+            document.getElementById('main-dashboard').classList.add('hidden');
+            document.getElementById('module-detail').classList.remove('hidden');
+            document.getElementById('sub-module-detail').classList.add('hidden');
+            
+            // Generate module content
+            let moduleHTML = `
+                <h2 style="color: var(--text); margin-bottom: 25px; font-size: 1.8rem;">
+                    ${config.icon} ${config.name}
+                </h2>
+                <div class="modules-grid">
+            `;
+            
+            config.subModules.forEach(subModule => {
+                moduleHTML += `
+                    <div class="sub-module-card" onclick="openSubModule('${subModule.id}')">
+                        <div class="module-header">
+                            <span class="sub-module-icon">${subModule.icon}</span>
+                            <h3>${subModule.name}</h3>
+                        </div>
+                        <p>${subModule.desc}</p>
+                        <button class="module-button" style="background: var(--accent);">
+                            Open ${subModule.name}
+                        </button>
+                    </div>
+                `;
+            });
+            
+            moduleHTML += '</div>';
+            
+            document.getElementById('module-content').innerHTML = moduleHTML;
+            updateBreadcrumb();
+        }
+
+        // Open a sub-module
+        function openSubModule(subModuleId) {
+            currentSubModule = subModuleId;
+            
+            const config = moduleConfig[currentModule];
+            const subConfig = config.subModules.find(sub => sub.id === subModuleId);
+            
+            // Show sub-module detail view
+            document.getElementById('module-detail').classList.add('hidden');
+            document.getElementById('sub-module-detail').classList.remove('hidden');
+            
+            // Generate sub-module content (placeholder)
+            const subModuleHTML = `
+                <h2 style="color: var(--text); margin-bottom: 25px; font-size: 1.8rem;">
+                    ${subConfig.icon} ${subConfig.name}
+                </h2>
+                <div class="module-card">
+                    <p style="font-size: 1.1rem; margin-bottom: 20px;">
+                        ${subConfig.desc}
+                    </p>
+                    <div style="padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--primary);">
+                        <h4 style="color: var(--text); margin-bottom: 15px;">🚀 Module Features:</h4>
+                        <ul style="color: #666; line-height: 1.8;">
+                            <li>Interactive data processing tools</li>
+                            <li>Real-time analysis and visualization</li>
+                            <li>Export capabilities for results</li>
+                            <li>Integration with other modules</li>
+                        </ul>
+                    </div>
+                    <br>
+                    <div class="loading-demo" style="text-align: center; padding: 20px;">
+                        <p style="color: var(--text); margin-bottom: 15px;">
+                            <strong>Note:</strong> This is a static demo. In a full implementation, 
+                            this would connect to your Python backend or be built as a progressive web app.
+                        </p>
+                        <button class="module-button" onclick="simulateLoading(this)">
+                            Start Analysis
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('sub-module-content').innerHTML = subModuleHTML;
+            updateBreadcrumb();
+        }
+
+        // Simulate loading for demo purposes
+        function simulateLoading(button) {
+            const originalText = button.textContent;
+            button.innerHTML = '<span class="loading"></span> Processing...';
+            button.disabled = true;
+            
+            setTimeout(() => {
+                button.textContent = 'Analysis Complete ✅';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }, 2000);
+            }, 3000);
+        }
+
+        // Navigation functions
+        function backToModule() {
+            currentSubModule = null;
+            document.getElementById('sub-module-detail').classList.add('hidden');
+            document.getElementById('module-detail').classList.remove('hidden');
+            updateBreadcrumb();
+        }
+
+        function backToDashboard() {
+            currentModule = null;
+            currentSubModule = null;
+            document.getElementById('module-detail').classList.add('hidden');
+            document.getElementById('sub-module-detail').classList.add('hidden');
+            document.getElementById('main-dashboard').classList.remove('hidden');
+            updateBreadcrumb();
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
