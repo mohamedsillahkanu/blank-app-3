@@ -95,14 +95,24 @@ st.markdown("""
         text-align: center;
         border-top: 3px solid #4CAF50;
     }
+    
+    .column-list {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>🔗 File Combiner Tool</h1>
-    <p>Combine multiple XLS, XLSX, and CSV files with common columns</p>
+    <h1>🔗 Enhanced File Combiner Tool</h1>
+    <p>Combine multiple XLS, XLSX, and CSV files with ALL columns (common + uncommon)</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -113,6 +123,38 @@ if 'combined_df' not in st.session_state:
     st.session_state.combined_df = None
 if 'combination_log' not in st.session_state:
     st.session_state.combination_log = []
+
+def clean_dataframe(df: pd.DataFrame, filename: str) -> pd.DataFrame:
+    """Clean dataframe by removing empty rows and unnamed columns"""
+    original_shape = df.shape
+    
+    # Remove rows where first column is empty/null
+    if len(df.columns) > 0:
+        first_col = df.columns[0]
+        df = df.dropna(subset=[first_col])
+        df = df[df[first_col].astype(str).str.strip() != '']
+    
+    # Remove columns that are unnamed or have variations of 'Unnamed'
+    columns_to_keep = []
+    for col in df.columns:
+        col_str = str(col).lower().strip()
+        if not (col_str.startswith('unnamed') or col_str == 'nan' or col_str == ''):
+            columns_to_keep.append(col)
+    
+    df = df[columns_to_keep]
+    
+    # Remove completely empty rows
+    df = df.dropna(how='all')
+    
+    # Reset index
+    df = df.reset_index(drop=True)
+    
+    cleaned_shape = df.shape
+    
+    if original_shape != cleaned_shape:
+        st.info(f"📋 Cleaned {filename}: {original_shape[0]} → {cleaned_shape[0]} rows, {original_shape[1]} → {cleaned_shape[1]} columns")
+    
+    return df
 
 def read_file(uploaded_file) -> Tuple[pd.DataFrame, str]:
     """Read uploaded file and return DataFrame and file type"""
@@ -127,6 +169,9 @@ def read_file(uploaded_file) -> Tuple[pd.DataFrame, str]:
             file_type = 'Excel'
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
+        
+        # Clean the dataframe
+        df = clean_dataframe(df, uploaded_file.name)
         
         return df, file_type
     except Exception as e:
@@ -144,8 +189,15 @@ def find_common_columns(dataframes: List[pd.DataFrame]) -> List[str]:
     
     return sorted(list(common_cols))
 
+def get_all_columns(dataframes: List[pd.DataFrame]) -> List[str]:
+    """Get all unique columns across all dataframes"""
+    all_cols = set()
+    for df in dataframes:
+        all_cols.update(df.columns)
+    return sorted(list(all_cols))
+
 def combine_files_by_type(files_data: List[Dict]) -> Dict[str, pd.DataFrame]:
-    """Combine files by their type (CSV, Excel) based on common columns"""
+    """Combine files by their type (CSV, Excel) including ALL columns"""
     combined_dfs = {}
     
     # Group files by type
@@ -163,28 +215,28 @@ def combine_files_by_type(files_data: List[Dict]) -> Dict[str, pd.DataFrame]:
             combined_dfs[file_type] = files[0]['dataframe'].copy()
             combined_dfs[file_type]['source_file'] = files[0]['name']
         else:
-            # Multiple files of the same type - find common columns and combine
+            # Multiple files of the same type - combine ALL columns
             dataframes = [file_data['dataframe'] for file_data in files]
-            common_cols = find_common_columns(dataframes)
+            all_columns = get_all_columns(dataframes)
             
-            if common_cols:
-                # Combine using common columns
-                combined_list = []
-                for i, file_data in enumerate(files):
-                    df_subset = file_data['dataframe'][common_cols].copy()
-                    df_subset['source_file'] = file_data['name']
-                    combined_list.append(df_subset)
+            # Combine using ALL columns (common + uncommon)
+            combined_list = []
+            for i, file_data in enumerate(files):
+                df_copy = file_data['dataframe'].copy()
                 
-                combined_dfs[file_type] = pd.concat(combined_list, ignore_index=True)
-            else:
-                # No common columns - keep files separate with file identifier
-                combined_list = []
-                for file_data in files:
-                    df_copy = file_data['dataframe'].copy()
-                    df_copy['source_file'] = file_data['name']
-                    combined_list.append(df_copy)
+                # Add missing columns with NaN values
+                for col in all_columns:
+                    if col not in df_copy.columns:
+                        df_copy[col] = np.nan
                 
-                combined_dfs[file_type] = pd.concat(combined_list, ignore_index=True, sort=False)
+                # Reorder columns to match all_columns order
+                df_copy = df_copy[all_columns]
+                
+                # Add source file column
+                df_copy['source_file'] = file_data['name']
+                combined_list.append(df_copy)
+            
+            combined_dfs[file_type] = pd.concat(combined_list, ignore_index=True)
     
     return combined_dfs
 
@@ -204,13 +256,30 @@ def create_combination_log(files_data: List[Dict], combined_dfs: Dict[str, pd.Da
         if len(files) > 1:
             dataframes = [file_data['dataframe'] for file_data in files]
             common_cols = find_common_columns(dataframes)
+            all_cols = get_all_columns(dataframes)
             
             log_entry = {
                 'file_type': file_type,
                 'files_combined': len(files),
                 'file_names': [f['name'] for f in files],
                 'common_columns': common_cols,
+                'all_columns': all_cols,
+                'unique_columns': len(all_cols),
                 'total_rows_before': sum(df.shape[0] for df in dataframes),
+                'total_rows_after': combined_dfs[file_type].shape[0],
+                'columns_after': list(combined_dfs[file_type].columns)
+            }
+            log.append(log_entry)
+        else:
+            # Single file
+            log_entry = {
+                'file_type': file_type,
+                'files_combined': 1,
+                'file_names': [files[0]['name']],
+                'common_columns': list(files[0]['dataframe'].columns),
+                'all_columns': list(files[0]['dataframe'].columns),
+                'unique_columns': len(files[0]['dataframe'].columns),
+                'total_rows_before': files[0]['dataframe'].shape[0],
                 'total_rows_after': combined_dfs[file_type].shape[0],
                 'columns_after': list(combined_dfs[file_type].columns)
             }
@@ -222,7 +291,7 @@ def create_combination_log(files_data: List[Dict], combined_dfs: Dict[str, pd.Da
 st.markdown("""
 <div class="upload-section">
     <h3>📁 Upload Multiple Files</h3>
-    <p>Upload multiple XLS, XLSX, and CSV files to combine them by file type</p>
+    <p>Upload multiple XLS, XLSX, and CSV files to combine them with ALL columns preserved</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -230,14 +299,14 @@ uploaded_files = st.file_uploader(
     "Choose files",
     type=['csv', 'xlsx', 'xls'],
     accept_multiple_files=True,
-    help="Upload multiple CSV, XLS, or XLSX files. Files of the same type will be combined based on common columns."
+    help="Upload multiple CSV, XLS, or XLSX files. Files will be cleaned and combined with ALL columns preserved."
 )
 
 if uploaded_files:
     # Process uploaded files
     files_data = []
     
-    with st.spinner("Processing uploaded files..."):
+    with st.spinner("Processing and cleaning uploaded files..."):
         for uploaded_file in uploaded_files:
             df, file_type = read_file(uploaded_file)
             if df is not None:
@@ -289,21 +358,30 @@ if uploaded_files:
         for i, file_data in enumerate(files_data):
             badge_class = "csv" if file_data['type'] == 'CSV' else "excel"
             
-            st.markdown(f"""
-            <div class="file-card">
-                <div>
-                    <span class="file-type-badge {badge_class}">{file_data['type']}</span>
-                    <strong>{file_data['name']}</strong>
+            with st.expander(f"{file_data['type']}: {file_data['name']} ({file_data['shape'][0]} rows × {file_data['shape'][1]} columns)"):
+                st.markdown(f"""
+                <div class="file-card">
+                    <div>
+                        <span class="file-type-badge {badge_class}">{file_data['type']}</span>
+                        <strong>{file_data['name']}</strong>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <small>📏 Shape: {file_data['shape'][0]} rows × {file_data['shape'][1]} columns</small>
+                    </div>
                 </div>
-                <div style="margin-top: 0.5rem;">
-                    <small>📏 Shape: {file_data['shape'][0]} rows × {file_data['shape'][1]} columns</small><br>
-                    <small>📊 Columns: {', '.join(file_data['columns'][:5])}{'...' if len(file_data['columns']) > 5 else ''}</small>
+                """, unsafe_allow_html=True)
+                
+                # Display all columns in a scrollable box
+                st.markdown("**All Columns:**")
+                columns_text = ", ".join(file_data['columns'])
+                st.markdown(f"""
+                <div class="column-list">
+                    {columns_text}
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
         
-        # Show common columns analysis by file type
-        st.markdown("### 🔍 Common Columns Analysis")
+        # Show column analysis by file type
+        st.markdown("### 🔍 Column Analysis by File Type")
         
         files_by_type = {}
         for file_data in files_data:
@@ -316,26 +394,41 @@ if uploaded_files:
             if len(files) > 1:
                 dataframes = [f['dataframe'] for f in files]
                 common_cols = find_common_columns(dataframes)
+                all_cols = get_all_columns(dataframes)
+                unique_cols = set()
+                for f in files:
+                    unique_cols.update(f['columns'])
                 
                 st.markdown(f"""
                 <div class="column-info">
                     <strong>{file_type} Files ({len(files)} files)</strong><br>
-                    <strong>Common columns ({len(common_cols)}):</strong> {', '.join(common_cols) if common_cols else 'No common columns found'}<br>
+                    <strong>Total unique columns:</strong> {len(all_cols)}<br>
+                    <strong>Common columns ({len(common_cols)}):</strong> {', '.join(common_cols) if common_cols else 'None'}<br>
+                    <strong>All columns will be preserved in final output</strong><br>
                     <small>Files: {', '.join([f['name'] for f in files])}</small>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # Show all columns in expandable section
+                with st.expander(f"View all {len(all_cols)} columns for {file_type} files"):
+                    columns_text = ", ".join(all_cols)
+                    st.markdown(f"""
+                    <div class="column-list">
+                        {columns_text}
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
                 st.markdown(f"""
                 <div class="column-info">
                     <strong>{file_type} Files (1 file)</strong><br>
-                    <strong>All columns will be preserved:</strong> {', '.join(files[0]['columns'][:10])}{'...' if len(files[0]['columns']) > 10 else ''}<br>
+                    <strong>All {len(files[0]['columns'])} columns will be preserved</strong><br>
                     <small>File: {files[0]['name']}</small>
                 </div>
                 """, unsafe_allow_html=True)
         
         # Combine files button
-        if st.button("🔗 Combine Files", type="primary"):
-            with st.spinner("Combining files..."):
+        if st.button("🔗 Combine Files (ALL Columns)", type="primary"):
+            with st.spinner("Combining files with ALL columns..."):
                 try:
                     # Combine files by type
                     combined_dfs = combine_files_by_type(files_data)
@@ -347,7 +440,7 @@ if uploaded_files:
                     st.session_state.combined_df = combined_dfs
                     st.session_state.combination_log = combination_log
                     
-                    st.success("✅ Files combined successfully!")
+                    st.success("✅ Files combined successfully with ALL columns preserved!")
                     st.rerun()
                     
                 except Exception as e:
@@ -367,34 +460,57 @@ if st.session_state.combined_df:
                 <strong>{log_entry['file_type']} Files Combined</strong><br>
                 <strong>Files:</strong> {log_entry['files_combined']} files combined<br>
                 <strong>Names:</strong> {', '.join(log_entry['file_names'])}<br>
-                <strong>Common Columns:</strong> {len(log_entry['common_columns'])} ({', '.join(log_entry['common_columns']) if log_entry['common_columns'] else 'None'})<br>
+                <strong>Common Columns:</strong> {len(log_entry['common_columns'])}<br>
+                <strong>Total Unique Columns:</strong> {log_entry['unique_columns']}<br>
                 <strong>Rows:</strong> {log_entry['total_rows_before']} → {log_entry['total_rows_after']}<br>
-                <strong>Final Columns:</strong> {len(log_entry['columns_after'])}
+                <strong>Final Columns (including source_file):</strong> {len(log_entry['columns_after'])}
             </div>
             """, unsafe_allow_html=True)
+            
+            # Show all columns in the combined data
+            with st.expander(f"View all {len(log_entry['columns_after'])} columns in combined {log_entry['file_type']} data"):
+                columns_text = ", ".join(log_entry['columns_after'])
+                st.markdown(f"""
+                <div class="column-list">
+                    {columns_text}
+                </div>
+                """, unsafe_allow_html=True)
     
-    # Display each combined dataframe
+    # Display summary stats for each combined dataframe (NO DATAFRAME DISPLAY)
     for file_type, combined_df in st.session_state.combined_df.items():
-        st.markdown(f"### 📈 Combined {file_type} Data")
+        st.markdown(f"### 📈 Combined {file_type} Data Summary")
         
         # Show basic stats
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Rows", combined_df.shape[0])
         with col2:
-            st.metric("Columns", combined_df.shape[1])
+            st.metric("Total Columns", combined_df.shape[1])
         with col3:
             numeric_cols = combined_df.select_dtypes(include=[np.number]).shape[1]
             st.metric("Numeric Columns", numeric_cols)
+        with col4:
+            # Count unique source files
+            unique_sources = combined_df['source_file'].nunique() if 'source_file' in combined_df.columns else 1
+            st.metric("Source Files", unique_sources)
         
-        # Display the dataframe
-        st.dataframe(combined_df, use_container_width=True, height=400)
+        # Show data types summary
+        with st.expander(f"📊 Column Data Types for {file_type}"):
+            dtype_summary = combined_df.dtypes.value_counts()
+            for dtype, count in dtype_summary.items():
+                st.write(f"**{dtype}**: {count} columns")
         
-        # Show basic statistics for numeric columns
+        # Show basic statistics for numeric columns only
         numeric_data = combined_df.select_dtypes(include=[np.number])
         if not numeric_data.empty:
-            with st.expander(f"📊 Statistics for {file_type} Data"):
+            with st.expander(f"📊 Numeric Statistics for {file_type} Data"):
                 st.dataframe(numeric_data.describe(), use_container_width=True)
+        
+        # Show sample of source file distribution
+        if 'source_file' in combined_df.columns:
+            with st.expander(f"📁 Source File Distribution for {file_type}"):
+                source_counts = combined_df['source_file'].value_counts()
+                st.dataframe(source_counts.to_frame('Row Count'), use_container_width=True)
         
         st.markdown("---")
     
@@ -430,7 +546,7 @@ if st.session_state.combined_df:
             data=csv_data,
             file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime="text/csv",
-            help="Download combined data as CSV file"
+            help="Download combined data as CSV file with ALL columns"
         )
     
     with col2:
@@ -457,10 +573,11 @@ if st.session_state.combined_df:
                         'File_Type': log_entry['file_type'],
                         'Files_Combined': log_entry['files_combined'],
                         'File_Names': '; '.join(log_entry['file_names']),
-                        'Common_Columns': '; '.join(log_entry['common_columns']),
+                        'Common_Columns': len(log_entry['common_columns']),
+                        'Total_Unique_Columns': log_entry['unique_columns'],
                         'Rows_Before': log_entry['total_rows_before'],
                         'Rows_After': log_entry['total_rows_after'],
-                        'Final_Columns': '; '.join(log_entry['columns_after'])
+                        'Final_Columns_Count': len(log_entry['columns_after'])
                     })
                 
                 log_df = pd.DataFrame(log_data)
@@ -473,7 +590,7 @@ if st.session_state.combined_df:
             data=excel_data,
             file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download combined data as Excel file with multiple sheets"
+            help="Download combined data as Excel file with multiple sheets and ALL columns"
         )
 
 # Reset button in main area when files are uploaded
@@ -490,62 +607,67 @@ if st.session_state.uploaded_files_data:
 if not uploaded_files and not st.session_state.uploaded_files_data:
     
     # How it works section
-    st.subheader("ℹ️ How It Works")
+    st.subheader("ℹ️ How It Works - Enhanced Version")
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("""
-        **File Combination Logic:**
+        **Enhanced Combination Logic:**
         
-        1. **By File Type**: Files are grouped by type (CSV, Excel)
+        1. **Data Cleaning**: Removes empty rows and unnamed columns before merging
         
-        2. **Common Columns**: Within each type, files are combined based on common columns
+        2. **All Columns Preserved**: Combines ALL columns (common + uncommon)
         
-        3. **Source Tracking**: A 'source_file' column is added to track original files
+        3. **By File Type**: Files are grouped by type (CSV, Excel)
         
-        4. **No Common Columns**: If no common columns exist, all columns are preserved
+        4. **Source Tracking**: A 'source_file' column tracks original files
+        
+        5. **Missing Data Handling**: Missing columns filled with NaN values
         """)
     
     with col2:
         st.markdown("""
-        **Supported Formats:**
-        - 📄 CSV files
-        - 📊 Excel files (.xlsx, .xls)
+        **Data Cleaning Features:**
+        - Removes rows where first column is empty
+        - Removes "Unnamed" columns
+        - Removes completely empty rows
+        - Preserves all meaningful data
         
-        **Process:**
-        1. Upload multiple files
-        2. Automatic analysis
-        3. Smart combination
-        4. Download results
+        **Output Features:**
+        - All unique columns across files
+        - Complete data preservation
+        - Clear source file tracking
         """)
     
-    st.subheader("✨ Tool Features")
+    st.subheader("✨ Enhanced Tool Features")
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("""
-        **📋 File Processing:**
-        - Upload multiple files at once
-        - Support for CSV, XLS, and XLSX
-        - Automatic file type detection
-        - Smart column matching
+        **📋 Enhanced Processing:**
+        - Automatic data cleaning
+        - Preserve ALL columns (common + unique)
+        - Remove empty/unnamed data
+        - Smart column alignment
+        - Detailed progress reporting
         """)
     
     with col2:
         st.markdown("""
-        **🔗 Combination Logic:**
-        - Group files by type (CSV/Excel)
-        - Find common columns automatically
-        - Preserve source file information
-        - Handle files with different schemas
+        **🔗 Improved Combination:**
+        - No data loss (all columns preserved)
+        - Clean, organized output
+        - Comprehensive column analysis
+        - Statistics without data display
+        - Enhanced download options
         """)
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>🔗 Built with Streamlit | File Combiner Tool v1.0</p>
+    <p>🔗 Enhanced File Combiner Tool v2.0 | Preserves ALL Columns</p>
 </div>
 """, unsafe_allow_html=True)
