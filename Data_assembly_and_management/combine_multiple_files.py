@@ -196,6 +196,31 @@ def get_all_columns(dataframes: List[pd.DataFrame]) -> List[str]:
         all_cols.update(df.columns)
     return sorted(list(all_cols))
 
+def reorder_columns_by_type(df: pd.DataFrame) -> pd.DataFrame:
+    """Reorder columns to put categorical/text columns first, then numeric columns"""
+    # Separate columns by data type
+    categorical_cols = []
+    numeric_cols = []
+    
+    for col in df.columns:
+        if col == 'source_file':
+            continue  # Handle source_file separately at the end
+        
+        if df[col].dtype in ['object', 'string', 'category']:
+            categorical_cols.append(col)
+        elif pd.api.types.is_numeric_dtype(df[col]):
+            numeric_cols.append(col)
+        else:
+            # For datetime or other types, treat as categorical
+            categorical_cols.append(col)
+    
+    # Reorder: categorical first, then numeric, then source_file
+    new_column_order = categorical_cols + numeric_cols
+    if 'source_file' in df.columns:
+        new_column_order.append('source_file')
+    
+    return df[new_column_order]
+
 def combine_files_by_type(files_data: List[Dict]) -> Dict[str, pd.DataFrame]:
     """Combine files by their type (CSV, Excel) including ALL columns"""
     combined_dfs = {}
@@ -212,8 +237,9 @@ def combine_files_by_type(files_data: List[Dict]) -> Dict[str, pd.DataFrame]:
     for file_type, files in files_by_type.items():
         if len(files) == 1:
             # Only one file of this type
-            combined_dfs[file_type] = files[0]['dataframe'].copy()
-            combined_dfs[file_type]['source_file'] = files[0]['name']
+            combined_df = files[0]['dataframe'].copy()
+            combined_df['source_file'] = files[0]['name']
+            combined_dfs[file_type] = reorder_columns_by_type(combined_df)
         else:
             # Multiple files of the same type - combine ALL columns
             dataframes = [file_data['dataframe'] for file_data in files]
@@ -236,7 +262,8 @@ def combine_files_by_type(files_data: List[Dict]) -> Dict[str, pd.DataFrame]:
                 df_copy['source_file'] = file_data['name']
                 combined_list.append(df_copy)
             
-            combined_dfs[file_type] = pd.concat(combined_list, ignore_index=True)
+            combined_df = pd.concat(combined_list, ignore_index=True)
+            combined_dfs[file_type] = reorder_columns_by_type(combined_df)
     
     return combined_dfs
 
@@ -494,17 +521,38 @@ if st.session_state.combined_df:
             unique_sources = combined_df['source_file'].nunique() if 'source_file' in combined_df.columns else 1
             st.metric("Source Files", unique_sources)
         
-        # Show data types summary
+        # Show data types summary with categorical/text first
         with st.expander(f"📊 Column Data Types for {file_type}"):
-            dtype_summary = combined_df.dtypes.value_counts()
-            for dtype, count in dtype_summary.items():
-                st.write(f"**{dtype}**: {count} columns")
-        
-        # Show basic statistics for numeric columns only
-        numeric_data = combined_df.select_dtypes(include=[np.number])
-        if not numeric_data.empty:
-            with st.expander(f"📊 Numeric Statistics for {file_type} Data"):
-                st.dataframe(numeric_data.describe(), use_container_width=True)
+            # Separate and count by data type categories
+            categorical_cols = []
+            numeric_cols = []
+            other_cols = []
+            
+            for col in combined_df.columns:
+                if col == 'source_file':
+                    continue
+                    
+                dtype = combined_df[col].dtype
+                if dtype in ['object', 'string', 'category']:
+                    categorical_cols.append(col)
+                elif pd.api.types.is_numeric_dtype(dtype):
+                    numeric_cols.append(col)
+                else:
+                    other_cols.append(col)
+            
+            st.write(f"**📝 Categorical/Text Columns**: {len(categorical_cols)}")
+            if categorical_cols:
+                st.write(f"   {', '.join(categorical_cols[:10])}{'...' if len(categorical_cols) > 10 else ''}")
+            
+            st.write(f"**🔢 Numeric Columns**: {len(numeric_cols)}")
+            if numeric_cols:
+                st.write(f"   {', '.join(numeric_cols[:10])}{'...' if len(numeric_cols) > 10 else ''}")
+            
+            if other_cols:
+                st.write(f"**📅 Other Types**: {len(other_cols)}")
+                st.write(f"   {', '.join(other_cols)}")
+            
+            st.write(f"**📁 Source Tracking**: source_file column")
         
         # Show sample of source file distribution
         if 'source_file' in combined_df.columns:
