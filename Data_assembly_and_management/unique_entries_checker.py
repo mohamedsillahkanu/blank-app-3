@@ -236,50 +236,54 @@ if st.session_state.original_df is not None:
         categorical_cols = get_categorical_columns(current_df)
         
         if categorical_cols:
-            potential_errors = detect_potential_errors(current_df, categorical_cols)
-            
-            if potential_errors:
-                for col, col_errors in potential_errors.items():
-                    with st.expander(f"⚠️ {col} Issues", expanded=True):
-                        
-                        # Similar entries
-                        if 'similar_entries' in col_errors:
-                            st.markdown("**🔍 Similar Entries:**")
-                            for key, similar_list in col_errors['similar_entries'].items():
-                                st.markdown(f"**Group:** `{key}`")
-                                for item in similar_list:
-                                    count = current_df[current_df[col] == item].shape[0]
-                                    if item == key:
-                                        st.markdown(f"  • ✅ `{item}` ({count})")
-                                    else:
-                                        st.markdown(f"  • ❌ `{item}` ({count})")
-                                st.markdown("---")
-                        
-                        # Pattern issues
-                        if 'patterns' in col_errors:
-                            for pattern_type, pattern_values in col_errors['patterns'].items():
-                                if pattern_type == 'extra_spaces':
-                                    st.markdown("**🔤 Extra Spaces:**")
-                                elif pattern_type == 'mixed_case':
-                                    st.markdown("**🔠 Mixed Case:**")
-                                elif pattern_type == 'special_chars':
-                                    st.markdown("**🔣 Special Characters:**")
-                                elif pattern_type == 'numbers_vs_text':
-                                    st.markdown("**🔢 Number/Text Mix:**")
-                                
-                                for val in pattern_values[:5]:  # Show first 5
-                                    count = current_df[current_df[col] == val].shape[0]
-                                    st.markdown(f"  • `{repr(val)}` ({count})")
-                                
-                                if len(pattern_values) > 5:
-                                    st.markdown(f"  • ... and {len(pattern_values) - 5} more")
-                                st.markdown("---")
-            else:
-                st.markdown("""
-                <div class="success-message">
-                    <strong>✅ No obvious data entry errors detected!</strong>
-                </div>
-                """, unsafe_allow_html=True)
+            try:
+                potential_errors = detect_potential_errors(current_df, categorical_cols)
+                
+                if potential_errors:
+                    for col, col_errors in potential_errors.items():
+                        with st.expander(f"⚠️ {col} Issues", expanded=True):
+                            
+                            # Similar entries
+                            if 'similar_entries' in col_errors:
+                                st.markdown("**🔍 Similar Entries:**")
+                                for key, similar_list in col_errors['similar_entries'].items():
+                                    st.markdown(f"**Group:** `{key}`")
+                                    for item in similar_list:
+                                        count = current_df[current_df[col] == item].shape[0]
+                                        if item == key:
+                                            st.markdown(f"  • ✅ `{item}` ({count})")
+                                        else:
+                                            st.markdown(f"  • ❌ `{item}` ({count})")
+                                    st.markdown("---")
+                            
+                            # Pattern issues
+                            if 'patterns' in col_errors:
+                                for pattern_type, pattern_values in col_errors['patterns'].items():
+                                    if pattern_type == 'extra_spaces':
+                                        st.markdown("**🔤 Extra Spaces:**")
+                                    elif pattern_type == 'mixed_case':
+                                        st.markdown("**🔠 Mixed Case:**")
+                                    elif pattern_type == 'special_chars':
+                                        st.markdown("**🔣 Special Characters:**")
+                                    elif pattern_type == 'numbers_vs_text':
+                                        st.markdown("**🔢 Number/Text Mix:**")
+                                    
+                                    for val in pattern_values[:5]:  # Show first 5
+                                        count = current_df[current_df[col] == val].shape[0]
+                                        st.markdown(f"  • `{repr(val)}` ({count})")
+                                    
+                                    if len(pattern_values) > 5:
+                                        st.markdown(f"  • ... and {len(pattern_values) - 5} more")
+                                    st.markdown("---")
+                else:
+                    st.markdown("""
+                    <div class="success-message">
+                        <strong>✅ No obvious data entry errors detected!</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error detecting data issues: {str(e)}")
+                st.markdown("**Error Detection Unavailable**")
         else:
             st.markdown("No categorical columns to check for errors.")
     
