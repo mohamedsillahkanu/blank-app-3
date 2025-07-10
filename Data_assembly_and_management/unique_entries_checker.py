@@ -487,20 +487,114 @@ if st.session_state.original_df is not None:
             with col1:
                 st.markdown(f"**Unique Values ({len(unique_values)}):**")
                 
-                # Display values in a more organized way
-                values_per_row = 4
+                # Get error information for this column
+                try:
+                    column_errors = detect_potential_errors(current_df, [selected_cat_col])
+                    has_errors = selected_cat_col in column_errors
+                    similar_groups = {}
+                    problematic_values = set()
+                    
+                    if has_errors:
+                        if 'similar_entries' in column_errors[selected_cat_col]:
+                            similar_groups = column_errors[selected_cat_col]['similar_entries']
+                            for group_values in similar_groups.values():
+                                problematic_values.update(group_values)
+                        
+                        if 'patterns' in column_errors[selected_cat_col]:
+                            for pattern_values in column_errors[selected_cat_col]['patterns'].values():
+                                problematic_values.update(pattern_values)
+                
+                except:
+                    has_errors = False
+                    problematic_values = set()
+                    similar_groups = {}
+                
+                # Display values with error highlighting
+                values_per_row = 3
                 for i in range(0, len(unique_values), values_per_row):
                     row_values = unique_values[i:i+values_per_row]
                     value_cols = st.columns(len(row_values))
                     for j, val in enumerate(row_values):
                         with value_cols[j]:
                             count = current_df[current_df[selected_cat_col] == val].shape[0]
+                            
+                            # Check if this value has issues
+                            is_problematic = val in problematic_values
+                            is_similar_key = val in similar_groups.keys()
+                            
+                            # Determine the style and icon
+                            if is_similar_key:
+                                # This is the "good" version in a similar group
+                                box_class = "value-box"
+                                icon = "✅"
+                                status = "Recommended"
+                            elif is_problematic:
+                                # This value has issues
+                                box_class = "value-box problematic-value"
+                                icon = "⚠️"
+                                # Find which group this belongs to
+                                group_key = None
+                                for key, group_values in similar_groups.items():
+                                    if val in group_values and val != key:
+                                        group_key = key
+                                        break
+                                if group_key:
+                                    status = f"Similar to '{group_key}'"
+                                else:
+                                    status = "Needs review"
+                            else:
+                                # Normal value
+                                box_class = "value-box"
+                                icon = ""
+                                status = ""
+                            
+                            # Create the display
+                            value_display = f"<strong>{icon} {val}</strong>" if icon else f"<strong>{val}</strong>"
+                            status_display = f"<br><small style='color: #666;'>{status}</small>" if status else ""
+                            
                             st.markdown(f"""
-                            <div class="value-box">
-                                <strong>{val}</strong><br>
+                            <div class="{box_class}">
+                                {value_display}<br>
                                 <small>({count} records)</small>
+                                {status_display}
                             </div>
                             """, unsafe_allow_html=True)
+                
+                # Show similar groups summary if any
+                if similar_groups:
+                    st.markdown("---")
+                    st.markdown("**🔍 Similar Entry Groups:**")
+                    for key, group_values in similar_groups.items():
+                        other_values = [v for v in group_values if v != key]
+                        if other_values:
+                            st.markdown(f"**{key}** (recommended) ← {', '.join(other_values)}")
+                
+                # Quick action buttons for common fixes
+                if has_errors:
+                    st.markdown("---")
+                    st.markdown("**🚀 Quick Fixes:**")
+                    
+                    if similar_groups:
+                        if st.button("🔧 Auto-fix Similar Entries", key=f"auto_fix_{selected_cat_col}"):
+                            # Auto-apply fixes for similar entries
+                            if selected_cat_col not in st.session_state.categorical_changes:
+                                st.session_state.categorical_changes[selected_cat_col] = {'delete': [], 'replace': {}}
+                            
+                            fix_count = 0
+                            for key, group_values in similar_groups.items():
+                                for val in group_values:
+                                    if val != key:  # Don't replace the key with itself
+                                        st.session_state.categorical_changes[selected_cat_col]['replace'][val] = key
+                                        fix_count += 1
+                            
+                            if fix_count > 0:
+                                st.success(f"✅ Added {fix_count} automatic replacements")
+                                st.rerun()
+                    
+                    # Show count of issues
+                    total_issues = len(problematic_values)
+                    if total_issues > 0:
+                        st.info(f"📊 Found {total_issues} values that may need attention")
             
             with col2:
                 st.markdown("**Actions:**")
