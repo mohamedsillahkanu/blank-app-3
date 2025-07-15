@@ -3,103 +3,116 @@ library(dplyr)
 library(stringr)
 library(lubridate)
 
-# Assume df is your dataframe with a column named 'period_name' containing various date formats
-
+# Extract the values in the 'period_name' column to process
 period_values <- df$period_name
 
-# Initialize vectors to store extracted month, year, and year_month (character string "YYYY-MM")
+# Initialize empty vectors to store month, year, and year_month ("YYYY-MM") values
 month_vec <- integer(length(period_values))
 year_vec <- integer(length(period_values))
-year_month_vec <- character(length(period_values))  # To hold "YYYY-MM" strings
+year_month_vec <- character(length(period_values))
 
+# Loop through each value in the 'period_name' column
 for (i in seq_along(period_values)) {
   
-  val <- stringr::str_trim(period_values[i])  # Trim whitespace
+  # Clean up the string by trimming spaces
+  val <- stringr::str_trim(period_values[i])
   
-  m <- NA_integer_   # Default month as NA
-  y <- NA_integer_   # Default year as NA
-  ym_str <- NA_character_  # Default year_month as NA string
+  # Initialize temporary variables for each value
+  m <- NA_integer_
+  y <- NA_integer_
+  ym_str <- NA_character_
   
-  # Skip empty or NA values
+  # Check for missing or empty values
   if (is.na(val) || val == "") {
-    # Do nothing, leave NA
-    
-  # Below are multiple date format checks using if-else conditions
-  # Each block tries to parse the string val with a specific known format using lubridate::parse_date_time()
-  # Example: "Jan-2015", "01/2015", "2015-01", "January2015", "201501", etc.
-  
-  } else if (nchar(val) == 8 && substr(val, 4,4) == "-") {        # Format example: "Jan-2015"
+    dt <- NA
+
+  # Format: "Jan-2015"
+  } else if (nchar(val) == 8 && substr(val, 4,4) == "-") {
     dt <- tryCatch(lubridate::parse_date_time(val, "b-Y"), error = function(e) NA)
-    
-  } else if (nchar(val) == 8 && substr(val, 4,4) == " ") {        # Format example: "Jan 2015"
+
+  # Format: "Jan 2015"
+  } else if (nchar(val) == 8 && substr(val, 4,4) == " ") {
     dt <- tryCatch(lubridate::parse_date_time(val, "b Y"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "-") && nchar(stringr::word(val, 1, sep = "-")) > 3) {  # "January-2015"
+
+  # Format: "January-2015"
+  } else if (stringr::str_detect(val, "-") && nchar(stringr::word(val, 1, sep = "-")) > 3) {
     dt <- tryCatch(lubridate::parse_date_time(val, "B-Y"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, " ") && nchar(stringr::word(val, 1, sep = " ")) > 3) {  # "January 2015"
+
+  # Format: "January 2015"
+  } else if (stringr::str_detect(val, " ") && nchar(stringr::word(val, 1, sep = " ")) > 3) {
     dt <- tryCatch(lubridate::parse_date_time(val, "B Y"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "-") && grepl("^[0-9]{2}-[0-9]{4}$", val)) {            # "01-2015"
+
+  # Format: "01-2015"
+  } else if (stringr::str_detect(val, "-") && grepl("^[0-9]{2}-[0-9]{4}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "m-Y"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "/") && grepl("^[0-9]{2}/[0-9]{4}$", val)) {            # "01/2015"
+
+  # Format: "01/2015"
+  } else if (stringr::str_detect(val, "/") && grepl("^[0-9]{2}/[0-9]{4}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "m/Y"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "\\.") && grepl("^[0-9]{2}\\.[0-9]{4}$", val)) {        # "01.2015"
+
+  # Format: "01.2015"
+  } else if (stringr::str_detect(val, "\\.") && grepl("^[0-9]{2}\\.[0-9]{4}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "m.Y"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "-") && grepl("^[0-9]{4}-[0-9]{2}$", val)) {            # "2015-01"
+
+  # Format: "2015-01"
+  } else if (stringr::str_detect(val, "-") && grepl("^[0-9]{4}-[0-9]{2}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "Y-m"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "/") && grepl("^[0-9]{4}/[0-9]{2}$", val)) {            # "2015/01"
+
+  # Format: "2015/01"
+  } else if (stringr::str_detect(val, "/") && grepl("^[0-9]{4}/[0-9]{2}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "Y/m"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "\\.") && grepl("^[0-9]{4}\\.[0-9]{2}$", val)) {        # "2015.01"
+
+  # Format: "2015.01"
+  } else if (stringr::str_detect(val, "\\.") && grepl("^[0-9]{4}\\.[0-9]{2}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "Y.m"), error = function(e) NA)
-    
-  } else if (length(stringr::str_split(val, " ", simplify = TRUE)) == 2 && grepl("^[0-9]{4}", val)) {  # "2015 Jan"
+
+  # Format: "2015 Jan"
+  } else if (length(stringr::str_split(val, " ", simplify = TRUE)) == 2 && grepl("^[0-9]{4}", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "Y b"), error = function(e) NA)
-    
-  } else if (length(stringr::str_split(val, " ", simplify = TRUE)) == 2 && grepl("^[0-9]{4}", val)) {  # "2015 January"
+
+  # Format: "2015 January"
+  } else if (length(stringr::str_split(val, " ", simplify = TRUE)) == 2 && grepl("^[0-9]{4}", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "Y B"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "^[A-Za-z]{3,}[0-9]{4}$")) {                             # "January2015"
+
+  # Format: "January2015"
+  } else if (stringr::str_detect(val, "^[A-Za-z]{3,}[0-9]{4}$")) {
     dt <- tryCatch(lubridate::parse_date_time(val, "BY"), error = function(e) NA)
-    
-  } else if (stringr::str_detect(val, "^[A-Za-z]{3}[0-9]{4}$")) {                              # "Jan2015"
+
+  # Format: "Jan2015"
+  } else if (stringr::str_detect(val, "^[A-Za-z]{3}[0-9]{4}$")) {
     dt <- tryCatch(lubridate::parse_date_time(val, "bY"), error = function(e) NA)
-    
-  } else if (nchar(val) == 6 && grepl("^[0-9]{6}$", val)) {                                   # "201501"
+
+  # Format: "201501"
+  } else if (nchar(val) == 6 && grepl("^[0-9]{6}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "Ym"), error = function(e) NA)
-    
-  } else if (nchar(val) == 6 && grepl("^[0-9]{6}$", val)) {                                   # "012015"
+
+  # Format: "012015"
+  } else if (nchar(val) == 6 && grepl("^[0-9]{6}$", val)) {
     dt <- tryCatch(lubridate::parse_date_time(val, "mY"), error = function(e) NA)
-    
+
+  # Format not recognized
   } else {
-    dt <- NA  # If no format matched, assign NA
+    dt <- NA
   }
-  
+
   # If parsing succeeded, extract month and year, and build "YYYY-MM" string
   if (!is.na(dt)) {
-    m <- lubridate::month(dt)    # Extract numeric month (1-12)
-    y <- lubridate::year(dt)     # Extract year (e.g., 2015)
-    
-    # Create year-month string in "YYYY-MM" format (no day)
+    m <- lubridate::month(dt)
+    y <- lubridate::year(dt)
     ym_str <- sprintf("%04d-%02d", y, m)
   }
-  
-  # Save extracted values into corresponding vectors
-  month_vec[i] <- m          # Store month
-  year_vec[i] <- y           # Store year
-  year_month_vec[i] <- ym_str  # Store "YYYY-MM" string
+
+  # Save values into pre-created vectors
+  month_vec[i] <- m
+  year_vec[i] <- y
+  year_month_vec[i] <- ym_str
 }
 
-# Add new columns to df using dplyr::mutate() and pipe operator
+# Add extracted values as new columns in the dataframe
 df <- df |>
   dplyr::mutate(
-    month = month_vec,           # Numeric month (1-12)
-    year = year_vec,             # Numeric year (e.g., 2015)
-    year_month = year_month_vec  # Character year-month string "YYYY-MM"
+    month = month_vec,
+    year = year_vec,
+    year_month = year_month_vec
   )
 ```
