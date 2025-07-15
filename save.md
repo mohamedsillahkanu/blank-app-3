@@ -1,3 +1,4 @@
+```r
 library(dplyr)
 library(rio)
 library(here)
@@ -103,3 +104,4 @@ if (all(c("adm0", "adm1", "adm2", "adm3", "adm4", "hf", "year", "month") %in% na
 } else {
   message("Skipping hf: one or more required columns are missing.")
 }
+```
