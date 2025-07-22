@@ -77,7 +77,7 @@ def get_css():
         }}
         
         .header-image {{
-            max-height: 80px;
+            max-height: 150px;
             max-width: 150px;
             object-fit: contain;
             margin: 0 20px;
@@ -108,7 +108,7 @@ def get_css():
             .header-image-right {{
                 position: static;
                 transform: none;
-                margin: 20px 0;
+                margin: 10px 0;
             }}
             
             .header-content {{
