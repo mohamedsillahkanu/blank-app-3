@@ -248,8 +248,8 @@ def create_header_with_images():
     base_dir = os.path.abspath(os.path.dirname(__file__))
     
     # Image paths
-    nmcp_path = os.path.join(base_dir, "nmcp.png")
-    icf_path = os.path.join(base_dir, "icf.png")
+    nmcp_path = os.path.join(base_dir, "NMCP.png")
+    icf_path = os.path.join(base_dir, "ICF-SL.jpg")
     
     # Get base64 encoded images
     nmcp_base64 = get_image_base64(nmcp_path)
