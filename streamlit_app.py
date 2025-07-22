@@ -77,7 +77,7 @@ def get_css():
         }}
         
         .header-image {{
-            max-height: 150px;
+            max-height: 180px;
             max-width: 150px;
             object-fit: contain;
             margin: 0 20px;
