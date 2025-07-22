@@ -472,9 +472,9 @@ if st.session_state.df is not None:
                     'no_report_color': '#FF6B6B',
                     'report_color': '#4ECDC4',
                     'main_title': 'Facility Reporting Heat Map',
-                    'legend_title': 'Status',
-                    'no_report_label': 'No Activity',
-                    'report_label': 'Active'
+                    'legend_title': 'Reporting Status',
+                    'no_report_label': 'Do not report',
+                    'report_label': 'Report'
                 }
                 st.rerun()
         
@@ -484,9 +484,9 @@ if st.session_state.df is not None:
                     'no_report_color': '#E8F4FD',
                     'report_color': '#1E3A8A',
                     'main_title': 'Reporting Ocean: Facility Status Depths',
-                    'legend_title': 'Activity Level',
-                    'no_report_label': 'Shallow',
-                    'report_label': 'Deep'
+                    'legend_title': 'Reporting Status',
+                    'no_report_label': 'Do not report',
+                    'report_label': 'Report'
                 }
                 st.rerun()
         
@@ -496,9 +496,9 @@ if st.session_state.df is not None:
                     'no_report_color': '#FFF8DC',
                     'report_color': '#D2691E',
                     'main_title': 'Autumn Reporting Landscape',
-                    'legend_title': 'Harvest Status',
-                    'no_report_label': 'Dormant',
-                    'report_label': 'Harvesting'
+                    'legend_title': 'Reporting Status',
+                    'no_report_label': 'Do no report',
+                    'report_label': 'Report'
                 }
                 st.rerun()
         
