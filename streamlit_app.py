@@ -7,6 +7,7 @@ import importlib.util
 import pandas as pd
 from datetime import datetime
 import json
+import base64
 
 # Set page configuration for the main dashboard
 st.set_page_config(
@@ -25,6 +26,19 @@ COLORS = {
     "accent": "#64B5F6"         # Accent blue
 }
 
+# Function to encode image to base64
+def get_image_base64(image_path):
+    """Convert image to base64 string for embedding in HTML"""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except FileNotFoundError:
+        st.warning(f"Image not found: {image_path}")
+        return None
+    except Exception as e:
+        st.error(f"Error loading image {image_path}: {str(e)}")
+        return None
+
 # CSS for styling the dashboard
 def get_css():
     return f"""
@@ -42,7 +56,7 @@ def get_css():
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
         
-        /* Dashboard title styling */
+        /* Dashboard title styling with images */
         .dashboard-title {{
             background-color: {COLORS["primary"]};
             padding: 20px;
@@ -51,6 +65,63 @@ def get_css():
             text-align: center;
             margin-bottom: 30px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+        
+        .header-content {{
+            flex: 1;
+            text-align: center;
+        }}
+        
+        .header-image {{
+            max-height: 80px;
+            max-width: 150px;
+            object-fit: contain;
+            margin: 0 20px;
+        }}
+        
+        .header-image-left {{
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }}
+        
+        .header-image-right {{
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }}
+        
+        /* Responsive header for smaller screens */
+        @media (max-width: 768px) {{
+            .dashboard-title {{
+                flex-direction: column;
+                position: static;
+            }}
+            
+            .header-image-left,
+            .header-image-right {{
+                position: static;
+                transform: none;
+                margin: 10px 0;
+            }}
+            
+            .header-content {{
+                order: 2;
+            }}
+            
+            .header-image-left {{
+                order: 1;
+            }}
+            
+            .header-image-right {{
+                order: 3;
+            }}
         }}
         
         /* Module cards */
@@ -169,6 +240,37 @@ def get_greeting():
         return "Good Afternoon"
     else:
         return "Good Evening"
+
+# Function to create header with images
+def create_header_with_images():
+    """Create the dashboard header with left and right images"""
+    # Get the base directory
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    
+    # Image paths
+    nmcp_path = os.path.join(base_dir, "nmcp.png")
+    icf_path = os.path.join(base_dir, "icf.png")
+    
+    # Get base64 encoded images
+    nmcp_base64 = get_image_base64(nmcp_path)
+    icf_base64 = get_image_base64(icf_path)
+    
+    # Create header HTML with images
+    nmcp_img = f'<img src="data:image/png;base64,{nmcp_base64}" class="header-image header-image-left" alt="NMCP Logo">' if nmcp_base64 else ''
+    icf_img = f'<img src="data:image/png;base64,{icf_base64}" class="header-image header-image-right" alt="ICF Logo">' if icf_base64 else ''
+    
+    header_html = f"""
+    <div class="dashboard-title">
+        {nmcp_img}
+        <div class="header-content">
+            <h1>📊 Data Management and Analysis Tool</h1>
+            <p>{get_greeting()} | {datetime.now().strftime("%A, %B %d, %Y")}</p>
+        </div>
+        {icf_img}
+    </div>
+    """
+    
+    st.markdown(header_html, unsafe_allow_html=True)
 
 # Initialize session state for module navigation
 if 'current_module' not in st.session_state:
@@ -331,14 +433,8 @@ def main():
     # Apply custom CSS
     st.markdown(get_css(), unsafe_allow_html=True)
 
-    # Create header
-    header_html = f"""
-    <div class="dashboard-title">
-        <h1>📊 Data Management and Analysis Tool</h1>
-        <p>{get_greeting()} | {datetime.now().strftime("%A, %B %d, %Y")}</p>
-    </div>
-    """
-    st.markdown(header_html, unsafe_allow_html=True)
+    # Create header with images
+    create_header_with_images()
 
     # Show breadcrumb navigation
     create_breadcrumb()
