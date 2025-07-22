@@ -108,7 +108,7 @@ def get_css():
             .header-image-right {{
                 position: static;
                 transform: none;
-                margin: 10px 0;
+                margin: 20px 0;
             }}
             
             .header-content {{
