@@ -468,7 +468,7 @@ if uploaded_files:
                     st.session_state.combination_log = combination_log
                     
                     st.success("✅ Files combined successfully with ALL columns preserved!")
-                    st.rerun()
+                    # Removed st.rerun() - no automatic rerun after combination
                     
                 except Exception as e:
                     st.error(f"❌ Error combining files: {str(e)}")
@@ -562,7 +562,7 @@ if st.session_state.combined_df:
         
         st.markdown("---")
     
-    # Download options
+    # Download options - CSV ONLY
     st.subheader("💾 Download Combined Data")
     
     # Prepare download data
@@ -581,65 +581,18 @@ if st.session_state.combined_df:
         df_to_download = pd.concat(all_dfs, ignore_index=True, sort=False)
         download_filename = "combined_all_data"
     
-    col1, col2 = st.columns(2)
+    # CSV download only
+    csv_buffer = io.StringIO()
+    df_to_download.to_csv(csv_buffer, index=False)
+    csv_data = csv_buffer.getvalue()
     
-    with col1:
-        # CSV download
-        csv_buffer = io.StringIO()
-        df_to_download.to_csv(csv_buffer, index=False)
-        csv_data = csv_buffer.getvalue()
-        
-        st.download_button(
-            label="📥 Download as CSV",
-            data=csv_data,
-            file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv",
-            help="Download combined data as CSV file with ALL columns"
-        )
-    
-    with col2:
-        # Excel download with multiple sheets
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            # If multiple file types, create separate sheets
-            if len(st.session_state.combined_df) > 1:
-                for file_type, df in st.session_state.combined_df.items():
-                    sheet_name = f"Combined_{file_type}"
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                
-                # Also create a combined sheet
-                df_to_download.to_excel(writer, sheet_name='All_Combined', index=False)
-            else:
-                # Single file type
-                df_to_download.to_excel(writer, sheet_name='Combined_Data', index=False)
-            
-            # Add combination log sheet
-            if st.session_state.combination_log:
-                log_data = []
-                for log_entry in st.session_state.combination_log:
-                    log_data.append({
-                        'File_Type': log_entry['file_type'],
-                        'Files_Combined': log_entry['files_combined'],
-                        'File_Names': '; '.join(log_entry['file_names']),
-                        'Common_Columns': len(log_entry['common_columns']),
-                        'Total_Unique_Columns': log_entry['unique_columns'],
-                        'Rows_Before': log_entry['total_rows_before'],
-                        'Rows_After': log_entry['total_rows_after'],
-                        'Final_Columns_Count': len(log_entry['columns_after'])
-                    })
-                
-                log_df = pd.DataFrame(log_data)
-                log_df.to_excel(writer, sheet_name='Combination_Log', index=False)
-        
-        excel_data = excel_buffer.getvalue()
-        
-        st.download_button(
-            label="📥 Download as Excel",
-            data=excel_data,
-            file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download combined data as Excel file with multiple sheets and ALL columns"
-        )
+    st.download_button(
+        label="📥 Download as CSV",
+        data=csv_data,
+        file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+        mime="text/csv",
+        help="Download combined data as CSV file with ALL columns"
+    )
 
 # Reset button in main area when files are uploaded
 if st.session_state.uploaded_files_data:
@@ -649,7 +602,7 @@ if st.session_state.uploaded_files_data:
         st.session_state.uploaded_files_data = []
         st.session_state.combined_df = None
         st.session_state.combination_log = []
-        st.rerun()
+        # Removed st.rerun() - no automatic rerun after reset
 
 # Show features and how it works when no files are uploaded
 if not uploaded_files and not st.session_state.uploaded_files_data:
@@ -709,7 +662,7 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Clean, organized output
         - Comprehensive column analysis
         - Statistics without data display
-        - Enhanced download options
+        - CSV download option
         """)
 
 # Footer
