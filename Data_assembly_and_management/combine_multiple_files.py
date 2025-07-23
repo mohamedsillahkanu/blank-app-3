@@ -4,7 +4,6 @@ import io
 from datetime import datetime
 from typing import List, Dict, Tuple
 import numpy as np
-import gc  # For garbage collection
 
 # Set page config
 st.set_page_config(
@@ -106,31 +105,16 @@ st.markdown("""
         overflow-y: auto;
         border: 1px solid #dee2e6;
     }
-    
-    .clear-memory-section {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 8px;
-        border: 1px solid #ffeaa7;
-        margin: 1rem 0;
-        text-align: center;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>🔗 Simple File Combiner Tool</h1>
+    <h1>🔗 Enhanced File Combiner Tool</h1>
     <p>Combine multiple XLS, XLSX, and CSV files with ALL columns (common + uncommon)</p>
 </div>
 """, unsafe_allow_html=True)
-
-# Clear any potential cached functions on startup
-try:
-    st.cache_data.clear()
-except:
-    pass
 
 # Initialize session state
 if 'uploaded_files_data' not in st.session_state:
@@ -140,72 +124,38 @@ if 'combined_df' not in st.session_state:
 if 'combination_log' not in st.session_state:
     st.session_state.combination_log = []
 
-def clear_memory_and_cache():
-    """Clear all session state data, uploaded files, and force garbage collection"""
-    # Clear all session state completely
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    
-    # Reinitialize the basic session state
-    st.session_state.uploaded_files_data = []
-    st.session_state.combined_df = None
-    st.session_state.combination_log = []
-    
-    # Force garbage collection to free memory
-    gc.collect()
-    
-    # Clear Streamlit cache completely
-    try:
-        st.cache_data.clear()
-        st.cache_resource.clear()
-    except:
-        pass  # In case cache clearing fails
-
-# Add manual clear button for users who want to start fresh
-if st.session_state.uploaded_files_data or st.session_state.combined_df:
-    st.markdown("---")
-    st.markdown("### 🧹 Memory Management")
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        if st.button("🔄 Clear All & Start Fresh", type="secondary", use_container_width=True):
-            clear_memory_and_cache()
-            st.success("✅ Everything cleared! Upload new files to start fresh.")
-            st.rerun()
-
 def clean_dataframe(df: pd.DataFrame, filename: str) -> pd.DataFrame:
-    """Clean dataframe by removing empty rows and unnamed columns - optimized"""
+    """Clean dataframe by removing empty rows and unnamed columns"""
     original_shape = df.shape
     
-    # Quick check if cleaning is needed
-    if df.empty:
-        return df
-    
-    # Remove unnamed columns efficiently
-    good_columns = [col for col in df.columns 
-                   if not str(col).lower().strip().startswith('unnamed') 
-                   and str(col).lower().strip() not in ['nan', '']]
-    
-    if good_columns:
-        df = df[good_columns]
-    
-    # Remove empty rows efficiently
+    # Remove rows where first column is empty/null
     if len(df.columns) > 0:
-        # Remove rows where first column is empty
         first_col = df.columns[0]
         df = df.dropna(subset=[first_col])
-        mask = df[first_col].astype(str).str.strip() != ''
-        df = df[mask]
+        df = df[df[first_col].astype(str).str.strip() != '']
+    
+    # Remove columns that are unnamed or have variations of 'Unnamed'
+    columns_to_keep = []
+    for col in df.columns:
+        col_str = str(col).lower().strip()
+        if not (col_str.startswith('unnamed') or col_str == 'nan' or col_str == ''):
+            columns_to_keep.append(col)
+    
+    df = df[columns_to_keep]
     
     # Remove completely empty rows
-    df = df.dropna(how='all').reset_index(drop=True)
+    df = df.dropna(how='all')
+    
+    # Reset index
+    df = df.reset_index(drop=True)
     
     cleaned_shape = df.shape
+    
     if original_shape != cleaned_shape:
         st.info(f"📋 Cleaned {filename}: {original_shape[0]} → {cleaned_shape[0]} rows, {original_shape[1]} → {cleaned_shape[1]} columns")
     
     return df
 
-@st.cache_data
 def read_file(uploaded_file) -> Tuple[pd.DataFrame, str]:
     """Read uploaded file and return DataFrame and file type"""
     try:
@@ -272,7 +222,7 @@ def reorder_columns_by_type(df: pd.DataFrame) -> pd.DataFrame:
     return df[new_column_order]
 
 def combine_files_by_type(files_data: List[Dict]) -> Dict[str, pd.DataFrame]:
-    """Combine files by their type (CSV, Excel) including ALL columns - optimized"""
+    """Combine files by their type (CSV, Excel) including ALL columns"""
     combined_dfs = {}
     
     # Group files by type
@@ -286,38 +236,34 @@ def combine_files_by_type(files_data: List[Dict]) -> Dict[str, pd.DataFrame]:
     # Combine files within each type
     for file_type, files in files_by_type.items():
         if len(files) == 1:
-            # Only one file of this type - simple case
+            # Only one file of this type
             combined_df = files[0]['dataframe'].copy()
             combined_df['source_file'] = files[0]['name']
-            combined_dfs[file_type] = combined_df
+            combined_dfs[file_type] = reorder_columns_by_type(combined_df)
         else:
-            # Multiple files - optimized combination
+            # Multiple files of the same type - combine ALL columns
             dataframes = [file_data['dataframe'] for file_data in files]
+            all_columns = get_all_columns(dataframes)
             
-            # Get all unique columns once
-            all_columns = set()
-            for df in dataframes:
-                all_columns.update(df.columns)
-            all_columns = sorted(list(all_columns))
-            
-            # Prepare list for concatenation
-            dfs_to_concat = []
-            for file_data in files:
-                df = file_data['dataframe'].copy()
+            # Combine using ALL columns (common + uncommon)
+            combined_list = []
+            for i, file_data in enumerate(files):
+                df_copy = file_data['dataframe'].copy()
                 
-                # Add missing columns efficiently
-                missing_cols = set(all_columns) - set(df.columns)
-                for col in missing_cols:
-                    df[col] = pd.NA  # Use pd.NA instead of np.nan for better performance
+                # Add missing columns with NaN values
+                for col in all_columns:
+                    if col not in df_copy.columns:
+                        df_copy[col] = np.nan
                 
-                # Reorder columns
-                df = df[all_columns]
-                df['source_file'] = file_data['name']
-                dfs_to_concat.append(df)
+                # Reorder columns to match all_columns order
+                df_copy = df_copy[all_columns]
+                
+                # Add source file column
+                df_copy['source_file'] = file_data['name']
+                combined_list.append(df_copy)
             
-            # Concatenate all at once (more efficient than iterative concat)
-            combined_df = pd.concat(dfs_to_concat, ignore_index=True, copy=False)
-            combined_dfs[file_type] = combined_df
+            combined_df = pd.concat(combined_list, ignore_index=True)
+            combined_dfs[file_type] = reorder_columns_by_type(combined_df)
     
     return combined_dfs
 
@@ -511,36 +457,17 @@ if uploaded_files:
         if st.button("🔗 Combine Files (ALL Columns)", type="primary"):
             with st.spinner("Combining files with ALL columns..."):
                 try:
-                    # Show progress
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    
-                    status_text.text("Combining files by type...")
-                    progress_bar.progress(30)
-                    
                     # Combine files by type
                     combined_dfs = combine_files_by_type(files_data)
-                    progress_bar.progress(70)
                     
-                    status_text.text("Creating combination log...")
                     # Create combination log
                     combination_log = create_combination_log(files_data, combined_dfs)
-                    progress_bar.progress(90)
                     
                     # Store results in session state
                     st.session_state.combined_df = combined_dfs
                     st.session_state.combination_log = combination_log
                     
-                    progress_bar.progress(100)
-                    status_text.text("Complete!")
-                    
                     st.success("✅ Files combined successfully with ALL columns preserved!")
-                    
-                    # Clear progress indicators
-                    progress_bar.empty()
-                    status_text.empty()
-                    
-                    # Force rerun to show download section
                     st.rerun()
                     
                 except Exception as e:
@@ -633,14 +560,16 @@ if st.session_state.combined_df:
                 source_counts = combined_df['source_file'].value_counts()
                 st.dataframe(source_counts.to_frame('Row Count'), use_container_width=True)
         
-        # Download options
+        st.markdown("---")
+    
+    # Download options
     st.subheader("💾 Download Combined Data")
     
     # Prepare download data
     if len(st.session_state.combined_df) == 1:
         # Single file type - download directly
         file_type, df_to_download = list(st.session_state.combined_df.items())[0]
-        default_filename = f"combined_{file_type.lower()}_data"
+        download_filename = f"combined_{file_type.lower()}_data"
     else:
         # Multiple file types - combine all into one
         all_dfs = []
@@ -650,53 +579,7 @@ if st.session_state.combined_df:
             all_dfs.append(df_copy)
         
         df_to_download = pd.concat(all_dfs, ignore_index=True, sort=False)
-        default_filename = "combined_all_data"
-    
-    # File naming section
-    st.markdown("### 📝 Customize Download Filename")
-    
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        custom_filename = st.text_input(
-            "Enter filename (without extension):",
-            value=default_filename,
-            help="Enter your preferred filename. The appropriate extension (.csv or .xlsx) will be added automatically.",
-            placeholder="e.g., my_combined_data"
-        )
-    
-    with col2:
-        # Show preview of final filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-        st.markdown("**Preview:**")
-        if custom_filename.strip():
-            clean_filename = custom_filename.strip().replace(" ", "_")
-            preview_csv = f"{clean_filename}_{timestamp}.csv"
-            preview_excel = f"{clean_filename}_{timestamp}.xlsx"
-        else:
-            clean_filename = default_filename
-            preview_csv = f"{clean_filename}_{timestamp}.csv"
-            preview_excel = f"{clean_filename}_{timestamp}.xlsx"
-        
-        st.markdown(f"📄 CSV: `{preview_csv}`")
-        st.markdown(f"📊 Excel: `{preview_excel}`")
-    
-    # Validate filename
-    if not custom_filename.strip():
-        st.warning("⚠️ Please enter a filename")
-        download_enabled = False
-    else:
-        # Clean filename (remove special characters, replace spaces with underscores)
-        clean_filename = custom_filename.strip().replace(" ", "_")
-        # Remove potentially problematic characters
-        import re
-        clean_filename = re.sub(r'[<>:"/\\|?*]', '', clean_filename)
-        if not clean_filename:
-            st.warning("⚠️ Please enter a valid filename")
-            download_enabled = False
-        else:
-            download_enabled = True
-    
-    st.markdown("---")
+        download_filename = "combined_all_data"
     
     col1, col2 = st.columns(2)
     
@@ -706,61 +589,67 @@ if st.session_state.combined_df:
         df_to_download.to_csv(csv_buffer, index=False)
         csv_data = csv_buffer.getvalue()
         
-        csv_download = st.download_button(
+        st.download_button(
             label="📥 Download as CSV",
             data=csv_data,
-            file_name=f"{clean_filename}_{timestamp}.csv",
+            file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime="text/csv",
-            help="Download combined data as CSV file with ALL columns",
-            key="csv_download",
-            disabled=not download_enabled
+            help="Download combined data as CSV file with ALL columns"
         )
     
     with col2:
-        # Excel download with multiple sheets - optimized
-        excel_download = st.download_button(
+        # Excel download with multiple sheets
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            # If multiple file types, create separate sheets
+            if len(st.session_state.combined_df) > 1:
+                for file_type, df in st.session_state.combined_df.items():
+                    sheet_name = f"Combined_{file_type}"
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                
+                # Also create a combined sheet
+                df_to_download.to_excel(writer, sheet_name='All_Combined', index=False)
+            else:
+                # Single file type
+                df_to_download.to_excel(writer, sheet_name='Combined_Data', index=False)
+            
+            # Add combination log sheet
+            if st.session_state.combination_log:
+                log_data = []
+                for log_entry in st.session_state.combination_log:
+                    log_data.append({
+                        'File_Type': log_entry['file_type'],
+                        'Files_Combined': log_entry['files_combined'],
+                        'File_Names': '; '.join(log_entry['file_names']),
+                        'Common_Columns': len(log_entry['common_columns']),
+                        'Total_Unique_Columns': log_entry['unique_columns'],
+                        'Rows_Before': log_entry['total_rows_before'],
+                        'Rows_After': log_entry['total_rows_after'],
+                        'Final_Columns_Count': len(log_entry['columns_after'])
+                    })
+                
+                log_df = pd.DataFrame(log_data)
+                log_df.to_excel(writer, sheet_name='Combination_Log', index=False)
+        
+        excel_data = excel_buffer.getvalue()
+        
+        st.download_button(
             label="📥 Download as Excel",
-            data=create_excel_file(st.session_state.combined_df, st.session_state.combination_log, df_to_download),
-            file_name=f"{clean_filename}_{timestamp}.xlsx",
+            data=excel_data,
+            file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download combined data as Excel file with multiple sheets and ALL columns",
-            key="excel_download",
-            disabled=not download_enabled
+            help="Download combined data as Excel file with multiple sheets and ALL columns"
         )
 
-@st.cache_data
-def create_excel_file(combined_dfs, combination_log, df_to_download):
-    """Create Excel file with optimized writing"""
-    excel_buffer = io.BytesIO()
-    with pd.ExcelWriter(excel_buffer, engine='openpyxl', options={'remove_timezone': True}) as writer:
-        # If multiple file types, create separate sheets
-        if len(combined_dfs) > 1:
-            for file_type, df in combined_dfs.items():
-                sheet_name = f"Combined_{file_type}"
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
-            
-            # Also create a combined sheet
-            df_to_download.to_excel(writer, sheet_name='All_Combined', index=False)
-        else:
-            # Single file type
-            df_to_download.to_excel(writer, sheet_name='Combined_Data', index=False)
-        
-        # Add combination log sheet (simplified)
-        if combination_log:
-            log_data = []
-            for log_entry in combination_log:
-                log_data.append({
-                    'File_Type': log_entry['file_type'],
-                    'Files_Combined': log_entry['files_combined'],
-                    'File_Names': '; '.join(log_entry['file_names']),
-                    'Total_Rows': log_entry['total_rows_after'],
-                    'Total_Columns': len(log_entry['columns_after'])
-                })
-            
-            log_df = pd.DataFrame(log_data)
-            log_df.to_excel(writer, sheet_name='Summary', index=False)
-    
-    return excel_buffer.getvalue()
+# Reset button in main area when files are uploaded
+if st.session_state.uploaded_files_data:
+    st.markdown("---")
+    if st.button("🔄 Upload New Files", type="secondary"):
+        # Clear all session state
+        st.session_state.uploaded_files_data = []
+        st.session_state.combined_df = None
+        st.session_state.combination_log = []
+        st.rerun()
 
 # Show features and how it works when no files are uploaded
 if not uploaded_files and not st.session_state.uploaded_files_data:
@@ -783,8 +672,6 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         4. **Source Tracking**: A 'source_file' column tracks original files
         
         5. **Missing Data Handling**: Missing columns filled with NaN values
-        
-        6. **Memory Management**: Simple clear button available
         """)
     
     with col2:
@@ -795,14 +682,10 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Removes completely empty rows
         - Preserves all meaningful data
         
-        **Enhanced Download & Reset Features:**
-        - CSV download only
-        - Auto-generated filenames
-        - Simple memory management with live preview
-        - Automatic memory clearing on download
-        - Manual reset button for fresh start
-        - No auto-restart after download
-        - Clean, efficient memory management
+        **Output Features:**
+        - All unique columns across files
+        - Complete data preservation
+        - Clear source file tracking
         """)
     
     st.subheader("✨ Enhanced Tool Features")
@@ -817,8 +700,6 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Remove empty/unnamed data
         - Smart column alignment
         - Detailed progress reporting
-        - Memory-efficient processing
-        - Custom filename support
         """)
     
     with col2:
@@ -828,15 +709,13 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Clean, organized output
         - Comprehensive column analysis
         - Statistics without data display
-        - Custom filename support
         - Enhanced download options
-        - Automatic memory clearing on download
         """)
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>🔗 Simple File Combiner Tool v3.1 | Complete Reset | CSV Only | Fresh Start Every Time</p>
+    <p>🔗 Enhanced File Combiner Tool v2.0 | Preserves ALL Columns</p>
 </div>
 """, unsafe_allow_html=True)
