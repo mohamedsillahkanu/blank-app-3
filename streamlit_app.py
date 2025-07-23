@@ -9,7 +9,13 @@ from datetime import datetime
 import json
 import base64
 import gc
-import psutil
+
+# Try to import psutil for memory monitoring (optional)
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 # Set page configuration for the main dashboard
 st.set_page_config(
@@ -275,17 +281,46 @@ def get_css():
             background-color: {COLORS["secondary"]} !important;
         }}
         
-        /* Memory status indicator */
-        .memory-status {{
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(30, 136, 229, 0.8);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 1000;
+        /* Memory management in header */
+        .memory-management {{
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }}
+        
+        .memory-info {{
+            color: {COLORS["text"]};
+            font-weight: bold;
+            font-size: 14px;
+        }}
+        
+        .memory-button {{
+            background-color: {COLORS["accent"]} !important;
+            color: white !important;
+            border: none !important;
+            padding: 5px 12px !important;
+            border-radius: 5px !important;
+            font-size: 12px !important;
+            cursor: pointer !important;
+            width: auto !important;
+        }}
+        
+        .memory-button:hover {{
+            background-color: {COLORS["secondary"]} !important;
+        }}
+        
+        /* Responsive memory management */
+        @media (max-width: 768px) {{
+            .memory-management {{
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }}
         }}
     </style>
     """
@@ -303,17 +338,25 @@ def get_greeting():
 # Function to get memory usage
 def get_memory_usage():
     """Get current memory usage percentage"""
-    try:
-        process = psutil.Process()
-        memory_info = process.memory_info()
-        memory_percent = process.memory_percent()
-        return f"RAM: {memory_percent:.1f}%"
-    except:
-        return "RAM: N/A"
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process()
+            memory_percent = process.memory_percent()
+            return f"RAM: {memory_percent:.1f}%"
+        except:
+            return "RAM: N/A"
+    else:
+        # Alternative method using sys.getsizeof for session state
+        try:
+            total_size = sum(sys.getsizeof(v) for v in st.session_state.values())
+            size_mb = total_size / (1024 * 1024)
+            return f"Session: {size_mb:.1f}MB"
+        except:
+            return "Memory: OK"
 
-# Function to create header with images and memory status
+# Function to create header with images and memory management
 def create_header_with_images():
-    """Create the dashboard header with left and right images and memory status"""
+    """Create the dashboard header with left and right images and memory management"""
     # Get the base directory
     base_dir = os.path.abspath(os.path.dirname(__file__))
     
@@ -325,14 +368,11 @@ def create_header_with_images():
     nmcp_base64 = get_image_base64(nmcp_path)
     icf_base64 = get_image_base64(icf_path)
     
-    # Create header HTML with images and memory status
+    # Create header HTML with images
     nmcp_img = f'<img src="data:image/png;base64,{nmcp_base64}" class="header-image header-image-left" alt="NMCP Logo">' if nmcp_base64 else ''
     icf_img = f'<img src="data:image/png;base64,{icf_base64}" class="header-image header-image-right" alt="ICF Logo">' if icf_base64 else ''
     
-    memory_status = get_memory_usage()
-    
     header_html = f"""
-    <div class="memory-status">{memory_status}</div>
     <div class="dashboard-title">
         {nmcp_img}
         <div class="header-content">
@@ -344,6 +384,34 @@ def create_header_with_images():
     """
     
     st.markdown(header_html, unsafe_allow_html=True)
+    
+    # Add memory management section below header
+    memory_usage = get_memory_usage()
+    
+    memory_html = f"""
+    <div class="memory-management">
+        <div class="memory-info">
+            🧠 Memory Usage: {memory_usage} | ✅ Auto-cleanup active
+        </div>
+    </div>
+    """
+    
+    st.markdown(memory_html, unsafe_allow_html=True)
+    
+    # Add memory management controls
+    col1, col2, col3 = st.columns([4, 1, 1])
+    
+    with col2:
+        if st.button("🗑️ Clear Now", key="header_manual_cleanup", help="Clear memory immediately"):
+            if clear_memory():
+                st.success("Memory cleared!")
+                st.rerun()
+            else:
+                st.error("Cleanup failed!")
+    
+    with col3:
+        if st.button("🔄 Refresh", key="header_refresh", help="Refresh memory status"):
+            st.rerun()
 
 # Initialize session state for module navigation
 if 'current_module' not in st.session_state:
@@ -648,6 +716,12 @@ def main():
         
         # Show memory usage
         st.markdown(f"**Current Usage:** {get_memory_usage()}")
+        
+        # Show cleanup status
+        if not PSUTIL_AVAILABLE:
+            st.info("💡 Install `psutil` for detailed memory monitoring")
+        else:
+            st.success("✅ Advanced memory monitoring active")
     
     # Create footer
     footer_html = """
