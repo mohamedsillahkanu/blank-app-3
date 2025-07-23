@@ -8,6 +8,8 @@ import pandas as pd
 from datetime import datetime
 import json
 import base64
+import gc
+import psutil
 
 # Set page configuration for the main dashboard
 st.set_page_config(
@@ -25,6 +27,50 @@ COLORS = {
     "text": "#0D47A1",          # Dark blue text
     "accent": "#64B5F6"         # Accent blue
 }
+
+# Memory cleanup function
+def clear_memory():
+    """Clear memory by removing cached data and running garbage collection"""
+    try:
+        # Clear Streamlit cache
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        
+        # Clear pandas cache if any
+        if hasattr(pd, '_cache'):
+            pd._cache.clear()
+        
+        # Remove large variables from session state
+        keys_to_remove = []
+        for key in st.session_state:
+            if key.startswith('data_') or key.startswith('df_') or key.startswith('result_'):
+                keys_to_remove.append(key)
+        
+        for key in keys_to_remove:
+            del st.session_state[key]
+        
+        # Force garbage collection
+        gc.collect()
+        
+        # Clear any matplotlib figures if imported
+        try:
+            import matplotlib.pyplot as plt
+            plt.close('all')
+        except ImportError:
+            pass
+        
+        return True
+    except Exception as e:
+        st.error(f"Memory cleanup error: {str(e)}")
+        return False
+
+# Enhanced button with auto cleanup
+def cleanup_button(label, key=None, **kwargs):
+    """Custom button that automatically cleans memory when clicked"""
+    button_clicked = st.button(label, key=key, **kwargs)
+    if button_clicked:
+        clear_memory()
+    return button_clicked
 
 # Function to encode image to base64
 def get_image_base64(image_path):
@@ -228,6 +274,19 @@ def get_css():
         .sub-module-button:hover {{
             background-color: {COLORS["secondary"]} !important;
         }}
+        
+        /* Memory status indicator */
+        .memory-status {{
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(30, 136, 229, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }}
     </style>
     """
 
@@ -241,9 +300,20 @@ def get_greeting():
     else:
         return "Good Evening"
 
-# Function to create header with images
+# Function to get memory usage
+def get_memory_usage():
+    """Get current memory usage percentage"""
+    try:
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        memory_percent = process.memory_percent()
+        return f"RAM: {memory_percent:.1f}%"
+    except:
+        return "RAM: N/A"
+
+# Function to create header with images and memory status
 def create_header_with_images():
-    """Create the dashboard header with left and right images"""
+    """Create the dashboard header with left and right images and memory status"""
     # Get the base directory
     base_dir = os.path.abspath(os.path.dirname(__file__))
     
@@ -255,11 +325,14 @@ def create_header_with_images():
     nmcp_base64 = get_image_base64(nmcp_path)
     icf_base64 = get_image_base64(icf_path)
     
-    # Create header HTML with images
+    # Create header HTML with images and memory status
     nmcp_img = f'<img src="data:image/png;base64,{nmcp_base64}" class="header-image header-image-left" alt="NMCP Logo">' if nmcp_base64 else ''
     icf_img = f'<img src="data:image/png;base64,{icf_base64}" class="header-image header-image-right" alt="ICF Logo">' if icf_base64 else ''
     
+    memory_status = get_memory_usage()
+    
     header_html = f"""
+    <div class="memory-status">{memory_status}</div>
     <div class="dashboard-title">
         {nmcp_img}
         <div class="header-content">
@@ -284,6 +357,9 @@ if 'navigation_stack' not in st.session_state:
 def import_module_safely(module_path, module_name):
     """Import a module from file path while handling set_page_config"""
     try:
+        # Clear memory before importing new module
+        clear_memory()
+        
         # Read the module content
         with open(module_path, 'r') as file:
             source_code = file.read()
@@ -378,9 +454,10 @@ def create_module_card(name, info, base_dir, is_sub_module=False):
     button_key = f"btn_sub_{name}" if is_sub_module else f"btn_{name}"
     button_class = "sub-module-button" if is_sub_module else ""
 
-    if st.button(f"Open {module_name}", 
-                 key=button_key, 
-                 disabled=not file_exists):
+    # Use cleanup_button instead of regular st.button
+    if cleanup_button(f"Open {module_name}", 
+                     key=button_key, 
+                     disabled=not file_exists):
         if is_sub_module:
             st.session_state.current_sub_module = name
         else:
@@ -422,18 +499,23 @@ def run_module(module_path, module_name):
                 module.main()
             else:
                 st.info(f"Module {module_name} has been loaded successfully.")
+                
+            # Clear memory after module execution
+            clear_memory()
         else:
             st.error(f"Failed to load module: {module_name}")
     except Exception as e:
         st.error(f"Error running module: {str(e)}")
         st.write(f"Details: {type(e).__name__}: {str(e)}")
+        # Clear memory even on error
+        clear_memory()
 
 # Main function to run the dashboard
 def main():
     # Apply custom CSS
     st.markdown(get_css(), unsafe_allow_html=True)
 
-    # Create header with images
+    # Create header with images and memory status
     create_header_with_images()
 
     # Show breadcrumb navigation
@@ -444,14 +526,14 @@ def main():
 
     # If a sub-module is selected, run it
     if st.session_state.current_sub_module and st.session_state.current_module:
-        # Add back buttons
+        # Add back buttons with cleanup
         col1, col2, col3 = st.columns([1, 1, 4])
         with col1:
-            if st.button("← Back to Module", key="back_to_module"):
+            if cleanup_button("← Back to Module", key="back_to_module"):
                 st.session_state.current_sub_module = None
                 st.rerun()
         with col2:
-            if st.button("← Back to Dashboard", key="back_to_dashboard"):
+            if cleanup_button("← Back to Dashboard", key="back_to_dashboard"):
                 st.session_state.current_module = None
                 st.session_state.current_sub_module = None
                 st.rerun()
@@ -467,8 +549,8 @@ def main():
 
     # If a main module is selected, show its sub-modules
     if st.session_state.current_module:
-        # Add a back button
-        if st.button("← Back to Dashboard", key="main_back_btn"):
+        # Add a back button with cleanup
+        if cleanup_button("← Back to Dashboard", key="main_back_btn"):
             st.session_state.current_module = None
             st.rerun()
 
@@ -554,6 +636,18 @@ def main():
             if i < len(module_list):
                 name, info = module_list[i]
                 create_module_card(name, info, base_dir)
+    
+    # Add manual cleanup button in sidebar
+    with st.sidebar:
+        st.markdown("### 🧹 Memory Management")
+        if st.button("🗑️ Clear Memory Now", key="manual_cleanup"):
+            if clear_memory():
+                st.success("Memory cleared successfully!")
+            else:
+                st.error("Failed to clear memory")
+        
+        # Show memory usage
+        st.markdown(f"**Current Usage:** {get_memory_usage()}")
     
     # Create footer
     footer_html = """
