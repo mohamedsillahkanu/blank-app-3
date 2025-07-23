@@ -133,8 +133,6 @@ if 'combined_df' not in st.session_state:
     st.session_state.combined_df = None
 if 'combination_log' not in st.session_state:
     st.session_state.combination_log = []
-if 'download_completed' not in st.session_state:
-    st.session_state.download_completed = False
 
 def clear_memory_and_cache():
     """Clear all session state data and force garbage collection"""
@@ -142,7 +140,6 @@ def clear_memory_and_cache():
     st.session_state.uploaded_files_data = []
     st.session_state.combined_df = None
     st.session_state.combination_log = []
-    st.session_state.download_completed = False
     
     # Force garbage collection to free memory
     gc.collect()
@@ -588,7 +585,16 @@ if st.session_state.combined_df:
                 source_counts = combined_df['source_file'].value_counts()
                 st.dataframe(source_counts.to_frame('Row Count'), use_container_width=True)
         
-        st.markdown("---")
+        # Add a prominent reset button at the top of download section
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("🔄 Reset & Clear All Memory", type="secondary", use_container_width=True):
+            clear_memory_and_cache()
+            st.success("✅ All data cleared! Ready for new files.")
+            st.rerun()
+    
+    st.markdown("---")
     
     # Download options
     st.subheader("💾 Download Combined Data")
@@ -597,7 +603,7 @@ if st.session_state.combined_df:
     if len(st.session_state.combined_df) == 1:
         # Single file type - download directly
         file_type, df_to_download = list(st.session_state.combined_df.items())[0]
-        download_filename = f"combined_{file_type.lower()}_data"
+        default_filename = f"combined_{file_type.lower()}_data"
     else:
         # Multiple file types - combine all into one
         all_dfs = []
@@ -607,7 +613,53 @@ if st.session_state.combined_df:
             all_dfs.append(df_copy)
         
         df_to_download = pd.concat(all_dfs, ignore_index=True, sort=False)
-        download_filename = "combined_all_data"
+        default_filename = "combined_all_data"
+    
+    # File naming section
+    st.markdown("### 📝 Customize Download Filename")
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        custom_filename = st.text_input(
+            "Enter filename (without extension):",
+            value=default_filename,
+            help="Enter your preferred filename. The appropriate extension (.csv or .xlsx) will be added automatically.",
+            placeholder="e.g., my_combined_data"
+        )
+    
+    with col2:
+        # Show preview of final filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+        st.markdown("**Preview:**")
+        if custom_filename.strip():
+            clean_filename = custom_filename.strip().replace(" ", "_")
+            preview_csv = f"{clean_filename}_{timestamp}.csv"
+            preview_excel = f"{clean_filename}_{timestamp}.xlsx"
+        else:
+            clean_filename = default_filename
+            preview_csv = f"{clean_filename}_{timestamp}.csv"
+            preview_excel = f"{clean_filename}_{timestamp}.xlsx"
+        
+        st.markdown(f"📄 CSV: `{preview_csv}`")
+        st.markdown(f"📊 Excel: `{preview_excel}`")
+    
+    # Validate filename
+    if not custom_filename.strip():
+        st.warning("⚠️ Please enter a filename")
+        download_enabled = False
+    else:
+        # Clean filename (remove special characters, replace spaces with underscores)
+        clean_filename = custom_filename.strip().replace(" ", "_")
+        # Remove potentially problematic characters
+        import re
+        clean_filename = re.sub(r'[<>:"/\\|?*]', '', clean_filename)
+        if not clean_filename:
+            st.warning("⚠️ Please enter a valid filename")
+            download_enabled = False
+        else:
+            download_enabled = True
+    
+    st.markdown("---")
     
     col1, col2 = st.columns(2)
     
@@ -617,19 +669,20 @@ if st.session_state.combined_df:
         df_to_download.to_csv(csv_buffer, index=False)
         csv_data = csv_buffer.getvalue()
         
-        if st.download_button(
+        csv_download = st.download_button(
             label="📥 Download as CSV",
             data=csv_data,
-            file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            file_name=f"{clean_filename}_{timestamp}.csv",
             mime="text/csv",
             help="Download combined data as CSV file with ALL columns (Memory will be cleared after download)",
-            key="csv_download"
-        ):
+            key="csv_download",
+            disabled=not download_enabled
+        )
+        
+        if csv_download:
             # Automatically clear memory immediately after download
-            with st.spinner("Clearing memory..."):
-                clear_memory_and_cache()
+            clear_memory_and_cache()
             st.success("✅ CSV downloaded and memory cleared successfully!")
-            st.rerun()
     
     with col2:
         # Excel download with multiple sheets
@@ -667,26 +720,31 @@ if st.session_state.combined_df:
         
         excel_data = excel_buffer.getvalue()
         
-        if st.download_button(
+        excel_download = st.download_button(
             label="📥 Download as Excel",
             data=excel_data,
-            file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            file_name=f"{clean_filename}_{timestamp}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             help="Download combined data as Excel file with multiple sheets and ALL columns (Memory will be cleared after download)",
-            key="excel_download"
-        ):
+            key="excel_download",
+            disabled=not download_enabled
+        )
+        
+        if excel_download:
             # Automatically clear memory immediately after download
-            with st.spinner("Clearing memory..."):
-                clear_memory_and_cache()
+            clear_memory_and_cache()
             st.success("✅ Excel downloaded and memory cleared successfully!")
-            st.rerun()
 
-# Reset button in main area when files are uploaded
-if st.session_state.uploaded_files_data and not st.session_state.download_completed:
+# Reset button in main area when files are uploaded (keeping the existing one too)
+if st.session_state.uploaded_files_data:
     st.markdown("---")
-    if st.button("🔄 Upload New Files", type="secondary"):
-        clear_memory_and_cache()
-        st.rerun()
+    st.markdown("### 🔄 Start Over")
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("🔄 Upload New Files", type="secondary", use_container_width=True):
+            clear_memory_and_cache()
+            st.success("✅ Ready for new files!")
+            st.rerun()
 
 # Show features and how it works when no files are uploaded
 if not uploaded_files and not st.session_state.uploaded_files_data:
@@ -710,7 +768,7 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         
         5. **Missing Data Handling**: Missing columns filled with NaN values
         
-        6. **Memory Management**: Auto-clear cache after downloads
+        6. **Memory Management**: Auto-clear memory on download
         """)
     
     with col2:
@@ -721,10 +779,14 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Removes completely empty rows
         - Preserves all meaningful data
         
-        **Memory Management:**
-        - Automatic memory clearing after downloads
-        - Cache optimization for large files
-        - Garbage collection for better performance
+        **Enhanced Download & Reset Features:**
+        - Custom filename support
+        - Manual reset functionality
+        - Clean download experience (no auto-restart) with live preview
+        - Automatic memory clearing on download
+        - Manual reset button for fresh start
+        - No auto-restart after download
+        - Clean, efficient memory management
         """)
     
     st.subheader("✨ Enhanced Tool Features")
@@ -740,6 +802,7 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Smart column alignment
         - Detailed progress reporting
         - Memory-efficient processing
+        - Custom filename support
         """)
     
     with col2:
@@ -749,14 +812,15 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Clean, organized output
         - Comprehensive column analysis
         - Statistics without data display
+        - Custom filename support
         - Enhanced download options
-        - Automatic memory management
+        - Automatic memory clearing on download
         """)
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>🔗 Enhanced File Combiner Tool v2.1 | Preserves ALL Columns | Auto Memory Clear</p>
+    <p>🔗 Enhanced File Combiner Tool v2.3 | Custom Filenames | Manual Reset | Clean Download Experience</p>
 </div>
 """, unsafe_allow_html=True)
