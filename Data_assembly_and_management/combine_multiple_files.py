@@ -585,18 +585,7 @@ if st.session_state.combined_df:
                 source_counts = combined_df['source_file'].value_counts()
                 st.dataframe(source_counts.to_frame('Row Count'), use_container_width=True)
         
-        # Add a prominent reset button at the top of download section
-    st.markdown("---")
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        if st.button("🔄 Reset & Clear All Memory", type="secondary", use_container_width=True):
-            clear_memory_and_cache()
-            st.success("✅ All data cleared! Ready for new files.")
-            st.rerun()
-    
-    st.markdown("---")
-    
-    # Download options
+        # Download options
     st.subheader("💾 Download Combined Data")
     
     # Prepare download data
@@ -680,9 +669,9 @@ if st.session_state.combined_df:
         )
         
         if csv_download:
-            # Automatically clear memory immediately after download
+            # Automatically reset immediately after download
             clear_memory_and_cache()
-            st.success("✅ CSV downloaded and memory cleared successfully!")
+            st.success("✅ CSV downloaded successfully! Memory cleared and ready for new files.")
     
     with col2:
         # Excel download with multiple sheets
@@ -731,20 +720,9 @@ if st.session_state.combined_df:
         )
         
         if excel_download:
-            # Automatically clear memory immediately after download
+            # Automatically reset immediately after download
             clear_memory_and_cache()
-            st.success("✅ Excel downloaded and memory cleared successfully!")
-
-# Reset button in main area when files are uploaded (keeping the existing one too)
-if st.session_state.uploaded_files_data:
-    st.markdown("---")
-    st.markdown("### 🔄 Start Over")
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        if st.button("🔄 Upload New Files", type="secondary", use_container_width=True):
-            clear_memory_and_cache()
-            st.success("✅ Ready for new files!")
-            st.rerun()
+            st.success("✅ Excel downloaded successfully! Memory cleared and ready for new files.")
 
 # Show features and how it works when no files are uploaded
 if not uploaded_files and not st.session_state.uploaded_files_data:
@@ -768,7 +746,7 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         
         5. **Missing Data Handling**: Missing columns filled with NaN values
         
-        6. **Memory Management**: Auto-clear memory on download
+        6. **Memory Management**: Auto-reset immediately on download
         """)
     
     with col2:
@@ -781,8 +759,8 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         
         **Enhanced Download & Reset Features:**
         - Custom filename support
-        - Manual reset functionality
-        - Clean download experience (no auto-restart) with live preview
+        - Automatic reset on download
+        - Clean download experience (no restart) with live preview
         - Automatic memory clearing on download
         - Manual reset button for fresh start
         - No auto-restart after download
@@ -821,6 +799,6 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>🔗 Enhanced File Combiner Tool v2.3 | Custom Filenames | Manual Reset | Clean Download Experience</p>
+    <p>🔗 Enhanced File Combiner Tool v2.4 | Custom Filenames | Auto-Reset on Download | Clean Experience</p>
 </div>
 """, unsafe_allow_html=True)
