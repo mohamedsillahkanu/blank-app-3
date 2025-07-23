@@ -121,10 +121,16 @@ st.markdown("""
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>🔗 Enhanced File Combiner Tool</h1>
+    <h1>🔗 Simple File Combiner Tool</h1>
     <p>Combine multiple XLS, XLSX, and CSV files with ALL columns (common + uncommon)</p>
 </div>
 """, unsafe_allow_html=True)
+
+# Clear any potential cached functions on startup
+try:
+    st.cache_data.clear()
+except:
+    pass
 
 # Initialize session state
 if 'uploaded_files_data' not in st.session_state:
@@ -135,8 +141,12 @@ if 'combination_log' not in st.session_state:
     st.session_state.combination_log = []
 
 def clear_memory_and_cache():
-    """Clear all session state data and force garbage collection"""
-    # Clear session state
+    """Clear all session state data, uploaded files, and force garbage collection"""
+    # Clear all session state completely
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    
+    # Reinitialize the basic session state
     st.session_state.uploaded_files_data = []
     st.session_state.combined_df = None
     st.session_state.combination_log = []
@@ -144,9 +154,12 @@ def clear_memory_and_cache():
     # Force garbage collection to free memory
     gc.collect()
     
-    # Clear Streamlit cache
-    st.cache_data.clear()
-    st.cache_resource.clear()
+    # Clear Streamlit cache completely
+    try:
+        st.cache_data.clear()
+        st.cache_resource.clear()
+    except:
+        pass  # In case cache clearing fails
 
 # Add manual clear button for users who want to start fresh
 if st.session_state.uploaded_files_data or st.session_state.combined_df:
@@ -156,7 +169,7 @@ if st.session_state.uploaded_files_data or st.session_state.combined_df:
     with col2:
         if st.button("🔄 Clear All & Start Fresh", type="secondary", use_container_width=True):
             clear_memory_and_cache()
-            st.success("✅ All data cleared! Upload new files to start.")
+            st.success("✅ Everything cleared! Upload new files to start fresh.")
             st.rerun()
 
 def clean_dataframe(df: pd.DataFrame, filename: str) -> pd.DataFrame:
@@ -824,6 +837,6 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>🔗 Simple File Combiner Tool v3.0 | CSV Only | Auto-Filename | Easy Memory Management</p>
+    <p>🔗 Simple File Combiner Tool v3.1 | Complete Reset | CSV Only | Fresh Start Every Time</p>
 </div>
 """, unsafe_allow_html=True)
