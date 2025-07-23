@@ -4,6 +4,7 @@ import io
 from datetime import datetime
 from typing import List, Dict, Tuple
 import numpy as np
+import gc  # For garbage collection
 
 # Set page config
 st.set_page_config(
@@ -105,6 +106,15 @@ st.markdown("""
         overflow-y: auto;
         border: 1px solid #dee2e6;
     }
+    
+    .clear-memory-section {
+        background-color: #fff3cd;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #ffeaa7;
+        margin: 1rem 0;
+        text-align: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -123,6 +133,23 @@ if 'combined_df' not in st.session_state:
     st.session_state.combined_df = None
 if 'combination_log' not in st.session_state:
     st.session_state.combination_log = []
+if 'download_completed' not in st.session_state:
+    st.session_state.download_completed = False
+
+def clear_memory_and_cache():
+    """Clear all session state data and force garbage collection"""
+    # Clear session state
+    st.session_state.uploaded_files_data = []
+    st.session_state.combined_df = None
+    st.session_state.combination_log = []
+    st.session_state.download_completed = False
+    
+    # Force garbage collection to free memory
+    gc.collect()
+    
+    # Clear Streamlit cache
+    st.cache_data.clear()
+    st.cache_resource.clear()
 
 def clean_dataframe(df: pd.DataFrame, filename: str) -> pd.DataFrame:
     """Clean dataframe by removing empty rows and unnamed columns"""
@@ -156,6 +183,7 @@ def clean_dataframe(df: pd.DataFrame, filename: str) -> pd.DataFrame:
     
     return df
 
+@st.cache_data
 def read_file(uploaded_file) -> Tuple[pd.DataFrame, str]:
     """Read uploaded file and return DataFrame and file type"""
     try:
@@ -589,13 +617,19 @@ if st.session_state.combined_df:
         df_to_download.to_csv(csv_buffer, index=False)
         csv_data = csv_buffer.getvalue()
         
-        st.download_button(
+        if st.download_button(
             label="📥 Download as CSV",
             data=csv_data,
             file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime="text/csv",
-            help="Download combined data as CSV file with ALL columns"
-        )
+            help="Download combined data as CSV file with ALL columns (Memory will be cleared after download)",
+            key="csv_download"
+        ):
+            # Automatically clear memory immediately after download
+            with st.spinner("Clearing memory..."):
+                clear_memory_and_cache()
+            st.success("✅ CSV downloaded and memory cleared successfully!")
+            st.rerun()
     
     with col2:
         # Excel download with multiple sheets
@@ -633,22 +667,25 @@ if st.session_state.combined_df:
         
         excel_data = excel_buffer.getvalue()
         
-        st.download_button(
+        if st.download_button(
             label="📥 Download as Excel",
             data=excel_data,
             file_name=f"{download_filename}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download combined data as Excel file with multiple sheets and ALL columns"
-        )
+            help="Download combined data as Excel file with multiple sheets and ALL columns (Memory will be cleared after download)",
+            key="excel_download"
+        ):
+            # Automatically clear memory immediately after download
+            with st.spinner("Clearing memory..."):
+                clear_memory_and_cache()
+            st.success("✅ Excel downloaded and memory cleared successfully!")
+            st.rerun()
 
 # Reset button in main area when files are uploaded
-if st.session_state.uploaded_files_data:
+if st.session_state.uploaded_files_data and not st.session_state.download_completed:
     st.markdown("---")
     if st.button("🔄 Upload New Files", type="secondary"):
-        # Clear all session state
-        st.session_state.uploaded_files_data = []
-        st.session_state.combined_df = None
-        st.session_state.combination_log = []
+        clear_memory_and_cache()
         st.rerun()
 
 # Show features and how it works when no files are uploaded
@@ -672,6 +709,8 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         4. **Source Tracking**: A 'source_file' column tracks original files
         
         5. **Missing Data Handling**: Missing columns filled with NaN values
+        
+        6. **Memory Management**: Auto-clear cache after downloads
         """)
     
     with col2:
@@ -682,10 +721,10 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Removes completely empty rows
         - Preserves all meaningful data
         
-        **Output Features:**
-        - All unique columns across files
-        - Complete data preservation
-        - Clear source file tracking
+        **Memory Management:**
+        - Automatic memory clearing after downloads
+        - Cache optimization for large files
+        - Garbage collection for better performance
         """)
     
     st.subheader("✨ Enhanced Tool Features")
@@ -700,6 +739,7 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Remove empty/unnamed data
         - Smart column alignment
         - Detailed progress reporting
+        - Memory-efficient processing
         """)
     
     with col2:
@@ -710,12 +750,13 @@ if not uploaded_files and not st.session_state.uploaded_files_data:
         - Comprehensive column analysis
         - Statistics without data display
         - Enhanced download options
+        - Automatic memory management
         """)
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>🔗 Enhanced File Combiner Tool v2.0 | Preserves ALL Columns</p>
+    <p>🔗 Enhanced File Combiner Tool v2.1 | Preserves ALL Columns | Auto Memory Clear</p>
 </div>
 """, unsafe_allow_html=True)
