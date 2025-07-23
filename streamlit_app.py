@@ -70,6 +70,49 @@ def clear_memory():
         st.error(f"Memory cleanup error: {str(e)}")
         return False
 
+# Memory warning and auto-cleanup function
+def check_memory_and_warn():
+    """Check memory usage and warn/cleanup if necessary"""
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process()
+            memory_percent = process.memory_percent()
+            
+            # Determine warning level and actions
+            if memory_percent >= 90:
+                st.error("🚨 CRITICAL: Memory usage at {:.1f}%! Auto-cleaning to prevent app crash...".format(memory_percent))
+                clear_memory()
+                st.success("✅ Emergency cleanup completed. Please save your work!")
+                return "critical"
+            elif memory_percent >= 75:
+                st.warning("⚠️ HIGH: Memory usage at {:.1f}%! Consider clearing memory soon.".format(memory_percent))
+                return "high"
+            elif memory_percent >= 60:
+                st.info("💡 MODERATE: Memory usage at {:.1f}%. Monitor usage closely.".format(memory_percent))
+                return "moderate"
+            else:
+                return "normal"
+                
+        except Exception as e:
+            st.error(f"Memory monitoring error: {str(e)}")
+            return "error"
+    else:
+        # Fallback: Check session state size
+        try:
+            total_size = sum(sys.getsizeof(v) for v in st.session_state.values())
+            size_mb = total_size / (1024 * 1024)
+            
+            if size_mb > 100:  # 100MB threshold for session state
+                st.warning(f"⚠️ Large session data: {size_mb:.1f}MB. Consider clearing memory.")
+                return "high"
+            elif size_mb > 50:
+                st.info(f"💡 Session data: {size_mb:.1f}MB. Monitor usage.")
+                return "moderate"
+            else:
+                return "normal"
+        except:
+            return "normal"
+
 # Enhanced button with auto cleanup
 def cleanup_button(label, key=None, **kwargs):
     """Custom button that automatically cleans memory when clicked"""
@@ -314,6 +357,30 @@ def get_css():
             background-color: {COLORS["secondary"]} !important;
         }}
         
+        /* Memory warning styles */
+        .memory-critical {{
+            background-color: #ff4444 !important;
+            color: white !important;
+            font-weight: bold !important;
+            animation: pulse 1s infinite !important;
+        }}
+        
+        .memory-high {{
+            background-color: #ff8800 !important;
+            color: white !important;
+            font-weight: bold !important;
+        }}
+        
+        .memory-moderate {{
+            background-color: #4CAF50 !important;
+            color: white !important;
+        }}
+        
+        .memory-normal {{
+            background-color: {COLORS["accent"]} !important;
+            color: white !important;
+        }}
+        
         /* Responsive memory management */
         @media (max-width: 768px) {{
             .memory-management {{
@@ -342,17 +409,46 @@ def get_memory_usage():
         try:
             process = psutil.Process()
             memory_percent = process.memory_percent()
-            return f"RAM: {memory_percent:.1f}%"
+            return memory_percent, f"RAM: {memory_percent:.1f}%"
         except:
-            return "RAM: N/A"
+            return 0, "RAM: N/A"
     else:
         # Alternative method using sys.getsizeof for session state
         try:
             total_size = sum(sys.getsizeof(v) for v in st.session_state.values())
             size_mb = total_size / (1024 * 1024)
-            return f"Session: {size_mb:.1f}MB"
+            return size_mb, f"Session: {size_mb:.1f}MB"
         except:
-            return "Memory: OK"
+            return 0, "Memory: OK"
+
+# Function to get memory status class for styling
+def get_memory_status_class():
+    """Get CSS class based on memory usage level"""
+    if PSUTIL_AVAILABLE:
+        try:
+            memory_percent = psutil.Process().memory_percent()
+            if memory_percent >= 90:
+                return "memory-critical"
+            elif memory_percent >= 75:
+                return "memory-high"
+            elif memory_percent >= 60:
+                return "memory-moderate"
+            else:
+                return "memory-normal"
+        except:
+            return "memory-normal"
+    else:
+        try:
+            total_size = sum(sys.getsizeof(v) for v in st.session_state.values())
+            size_mb = total_size / (1024 * 1024)
+            if size_mb > 100:
+                return "memory-high"
+            elif size_mb > 50:
+                return "memory-moderate"
+            else:
+                return "memory-normal"
+        except:
+            return "memory-normal"
 
 # Function to create header with images and memory management
 def create_header_with_images():
@@ -385,13 +481,28 @@ def create_header_with_images():
     
     st.markdown(header_html, unsafe_allow_html=True)
     
+    # Check memory and show warnings
+    warning_level = check_memory_and_warn()
+    
     # Add memory management section below header
-    memory_usage = get_memory_usage()
+    memory_percent, memory_display = get_memory_usage()
+    memory_class = get_memory_status_class()
+    
+    # Determine status message based on warning level
+    status_messages = {
+        "critical": "🚨 CRITICAL - Auto-cleaning active",
+        "high": "⚠️ HIGH - Clean memory soon", 
+        "moderate": "💡 MODERATE - Monitor closely",
+        "normal": "✅ NORMAL - Auto-cleanup active",
+        "error": "❌ ERROR - Monitor manually"
+    }
+    
+    status_message = status_messages.get(warning_level, "✅ Auto-cleanup active")
     
     memory_html = f"""
-    <div class="memory-management">
+    <div class="memory-management {memory_class}">
         <div class="memory-info">
-            🧠 Memory Usage: {memory_usage} | ✅ Auto-cleanup active
+            🧠 Memory Usage: {memory_display} | {status_message}
         </div>
     </div>
     """
@@ -402,15 +513,20 @@ def create_header_with_images():
     col1, col2, col3 = st.columns([4, 1, 1])
     
     with col2:
-        if st.button("🗑️ Clear Now", key="header_manual_cleanup", help="Clear memory immediately"):
+        # Change button color based on memory status
+        button_help = "Clear memory immediately - protects all users from app crashes"
+        if warning_level in ["critical", "high"]:
+            button_help = "🚨 URGENT: Clear memory now to prevent app crash!"
+            
+        if st.button("🗑️ Clear Now", key="header_manual_cleanup", help=button_help):
             if clear_memory():
-                st.success("Memory cleared!")
+                st.success("✅ Memory cleared! All users protected.")
                 st.rerun()
             else:
-                st.error("Cleanup failed!")
+                st.error("❌ Cleanup failed! Try again.")
     
     with col3:
-        if st.button("🔄 Refresh", key="header_refresh", help="Refresh memory status"):
+        if st.button("🔄 Refresh", key="header_refresh", help="Refresh memory status and warnings"):
             st.rerun()
 
 # Initialize session state for module navigation
@@ -583,7 +699,7 @@ def main():
     # Apply custom CSS
     st.markdown(get_css(), unsafe_allow_html=True)
 
-    # Create header with images and memory status
+    # Create header with images and memory management
     create_header_with_images()
 
     # Show breadcrumb navigation
@@ -704,24 +820,6 @@ def main():
             if i < len(module_list):
                 name, info = module_list[i]
                 create_module_card(name, info, base_dir)
-    
-    # Add manual cleanup button in sidebar
-    with st.sidebar:
-        st.markdown("### 🧹 Memory Management")
-        if st.button("🗑️ Clear Memory Now", key="manual_cleanup"):
-            if clear_memory():
-                st.success("Memory cleared successfully!")
-            else:
-                st.error("Failed to clear memory")
-        
-        # Show memory usage
-        st.markdown(f"**Current Usage:** {get_memory_usage()}")
-        
-        # Show cleanup status
-        if not PSUTIL_AVAILABLE:
-            st.info("💡 Install `psutil` for detailed memory monitoring")
-        else:
-            st.success("✅ Advanced memory monitoring active")
     
     # Create footer
     footer_html = """
