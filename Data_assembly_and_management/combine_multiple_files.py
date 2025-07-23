@@ -663,15 +663,10 @@ if st.session_state.combined_df:
             data=csv_data,
             file_name=f"{clean_filename}_{timestamp}.csv",
             mime="text/csv",
-            help="Download combined data as CSV file with ALL columns (Memory will be cleared after download)",
+            help="Download combined data as CSV file with ALL columns",
             key="csv_download",
             disabled=not download_enabled
         )
-        
-        if csv_download:
-            # Automatically reset immediately after download
-            clear_memory_and_cache()
-            st.success("✅ CSV downloaded successfully! Memory cleared and ready for new files.")
     
     with col2:
         # Excel download with multiple sheets
@@ -714,15 +709,10 @@ if st.session_state.combined_df:
             data=excel_data,
             file_name=f"{clean_filename}_{timestamp}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download combined data as Excel file with multiple sheets and ALL columns (Memory will be cleared after download)",
+            help="Download combined data as Excel file with multiple sheets and ALL columns",
             key="excel_download",
             disabled=not download_enabled
         )
-        
-        if excel_download:
-            # Automatically reset immediately after download
-            clear_memory_and_cache()
-            st.success("✅ Excel downloaded successfully! Memory cleared and ready for new files.")
 
 # Show features and how it works when no files are uploaded
 if not uploaded_files and not st.session_state.uploaded_files_data:
