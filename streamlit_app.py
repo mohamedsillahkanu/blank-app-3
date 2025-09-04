@@ -19,7 +19,7 @@ except ImportError:
 
 # Set page configuration for the main dashboard
 st.set_page_config(
-    page_title="Data Management and Analysis Tool",
+    page_title="SNT Automation",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
